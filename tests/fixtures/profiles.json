@@ -1,0 +1,9 @@
+[
+  {
+    "id": "lab-fixture-only", "model": "N9K-C93180YC-FX3",
+    "source_versions": ["10.3(5)", "10.4(3)F"], "target_version": "10.4(3)F",
+    "image_name": "lab-nxos.bin",
+    "image_checksum": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "image_size_bytes": 123456789, "hardware_qualified": false
+  }
+]

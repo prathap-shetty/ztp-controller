@@ -1,0 +1,24 @@
+! ztp-controller configuration-only bootstrap
+hostname {{ hostname }}
+feature ssh
+no feature telnet
+username {{ username }} role network-admin
+username {{ username }} sshkey {{ public_key }}
+ip access-list ZTP-SSH
+{% for source in initial.ssh_sources | sort %}
+  {{ loop.index * 10 }} permit tcp {{ source }} any eq 22
+{% endfor %}
+line vty
+  ip access-class ZTP-SSH in
+vrf context management
+  ip route 0.0.0.0/0 {{ management.gateway }}
+{% for server in initial.dns_servers | sort %}
+  ip name-server {{ server }}
+{% endfor %}
+interface mgmt0
+  vrf member management
+  ip address {{ management.address }}
+  no shutdown
+{% for server in initial.ntp_servers | sort %}
+ntp server {{ server }} use-vrf management
+{% endfor %}

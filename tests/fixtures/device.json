@@ -1,0 +1,16 @@
+{
+  "id": 1, "name": "lab-leaf-01", "serial": "FDO12345678",
+  "status": {"value": "staged", "label": "Staged"},
+  "device_type": {"model": "N9K-C93180YC-FX3", "manufacturer": {"slug": "cisco"}},
+  "platform": {"slug": "nxos"},
+  "primary_ip4": {"id": 10, "address": "192.0.2.10/24"},
+  "config_context": {
+    "provisioning": {"ztp_enabled": true},
+    "ztp": {
+      "target_nxos": "10.4(3)F",
+      "image": {"filename": "lab-nxos.bin", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+      "management": {"gateway": "192.0.2.1", "vrf": "management", "interface": "mgmt0"}
+    },
+    "unrelated_secret": "must-never-be-stored-or-returned"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "serial_number": "FDO12345678", "vendor": "cisco", "platform": "nxos",
+  "model": "N9K-C93180YC-FX3", "current_version": "10.3(5)",
+  "management_mac": "00:11:22:33:44:55"
+}

@@ -1,0 +1,13 @@
+.DS_Store
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+.env
+*.db
+.coverage
+secrets/
+!deploy/secrets/
+deploy/bootstrap/
+deploy/tls/

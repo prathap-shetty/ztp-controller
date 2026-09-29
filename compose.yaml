@@ -1,0 +1,144 @@
+name: ztp-controller
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: deploy/docker/Dockerfile
+  environment: &app-env
+    ZTP_DATABASE_URL: postgresql+psycopg://ztp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ztp
+    ZTP_NETBOX_URL: ${ZTP_NETBOX_URL:-https://netbox.example.invalid}
+    ZTP_NETBOX_VERIFY_SSL: ${ZTP_NETBOX_VERIFY_SSL:-true}
+    ZTP_NETBOX_TOKEN_FILE: /run/secrets/netbox_token
+    ZTP_NETBOX_AUTH_SCHEME: ${ZTP_NETBOX_AUTH_SCHEME:-Token}
+    ZTP_NETBOX_PLATFORM_SLUG: ${ZTP_NETBOX_PLATFORM_SLUG:-nxos}
+    ZTP_ALLOW_HTTP_NETBOX: ${ZTP_ALLOW_HTTP_NETBOX:-false}
+    ZTP_CATALOG_PATH: /srv/ztp/catalog/profiles.json
+    ZTP_EXECUTION_MODE: ${ZTP_EXECUTION_MODE:-planning-only}
+    ZTP_ALLOW_UNQUALIFIED_LAB: ${ZTP_ALLOW_UNQUALIFIED_LAB:-false}
+    ZTP_SSH_PUBLIC_KEY_FILE: /run/ztp-public/ztp.pub
+    ZTP_SSH_USERNAME: ${ZTP_SSH_USERNAME:-ztp}
+    ZTP_SSH_PRIVATE_KEY_FILE: /run/ztp-validation/id_rsa
+    ZTP_SSH_KNOWN_HOSTS_FILE: /run/ztp-validation/known_hosts
+    ZTP_VALIDATION_DELAY_SECONDS: ${ZTP_VALIDATION_DELAY_SECONDS:-90}
+    ZTP_VALIDATION_DEADLINE_SECONDS: ${ZTP_VALIDATION_DEADLINE_SECONDS:-1800}
+    ZTP_VALIDATION_RETRY_SECONDS: ${ZTP_VALIDATION_RETRY_SECONDS:-30}
+    ZTP_VALIDATION_MAX_ATTEMPTS: ${ZTP_VALIDATION_MAX_ATTEMPTS:-30}
+  secrets:
+    - netbox_token
+  volumes:
+    - ${ZTP_CATALOG_FILE:-./catalog/profiles.json}:/srv/ztp/catalog/profiles.json:ro
+    - ${ZTP_SSH_PUBLIC_DIR:-./secrets/ssh-public}:/run/ztp-public:ro
+  networks: [backend]
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  read_only: true
+  tmpfs: [/tmp]
+
+services:
+  postgres:
+    image: postgres:17-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+    environment:
+      POSTGRES_DB: ztp
+      POSTGRES_USER: ztp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ztp -d ztp"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    <<: *app
+    command: [alembic, upgrade, head]
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  ztp-api:
+    <<: *app
+    ports: ["127.0.0.1:${ZTP_API_PORT:-8000}:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  ztp-worker:
+    <<: *app
+    command: [python, -m, app.workers.maintenance]
+    volumes:
+      - ${ZTP_CATALOG_FILE:-./catalog/profiles.json}:/srv/ztp/catalog/profiles.json:ro
+      - ${ZTP_SSH_PUBLIC_DIR:-./secrets/ssh-public}:/run/ztp-public:ro
+      - ${ZTP_SSH_VALIDATION_DIR:-./secrets/ssh-validation}:/run/ztp-validation:ro
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    profiles: [provisioning, web]
+    user: "101:101"
+    entrypoint: [nginx, -g, "daemon off;"]
+    ports:
+      - "${ZTP_BIND_ADDRESS:-127.0.0.1}:${ZTP_HTTP_PORT:-8080}:8080"
+      - "${ZTP_BIND_ADDRESS:-127.0.0.1}:${ZTP_HTTPS_PORT:-8443}:8443"
+    volumes:
+      - ${ZTP_NGINX_CONFIG:-./deploy/nginx/nginx.conf}:/etc/nginx/nginx.conf:ro
+      - ${ZTP_BOOTSTRAP_DIR:-./deploy/bootstrap}:/srv/bootstrap:ro
+      - ${ZTP_TLS_DIR:-./deploy/tls}:/run/tls:ro
+    tmpfs: [/tmp]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [backend]
+    depends_on:
+      ztp-api: {condition: service_healthy}
+    restart: unless-stopped
+
+  kea-dhcp4:
+    image: docker.cloudsmith.io/isc/docker/kea-dhcp4@sha256:9c67ace6719e846cab3dcbac594530f6b45f3c6aa74be1ca41702bca2cfa3176
+    platform: linux/amd64
+    profiles: [provisioning]
+    network_mode: host
+    entrypoint: [/bin/sh, /opt/ztp/start-kea.sh]
+    volumes:
+      - ${ZTP_KEA_CONFIG:-./deploy/kea/kea-dhcp4.json}:/etc/kea/kea-dhcp4.json:ro
+      - kea-leases:/var/lib/kea
+      - ./deploy/kea/start.sh:/opt/ztp/start-kea.sh:ro
+    tmpfs: [/run, /tmp]
+    cap_drop: [ALL]
+    cap_add: [NET_RAW, NET_BIND_SERVICE, DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  tftp:
+    build:
+      context: .
+      dockerfile: deploy/tftp/Dockerfile
+    profiles: [tftp]
+    network_mode: host
+    environment:
+      TFTP_BIND_ADDRESS: ${ZTP_BIND_ADDRESS:-127.0.0.1}
+    volumes:
+      - ${ZTP_BOOTSTRAP_DIR:-./deploy/bootstrap}:/srv/bootstrap:ro
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE, SYS_CHROOT, SETUID, SETGID]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+networks:
+  backend: {}
+volumes:
+  postgres-data: {}
+  kea-leases: {}
+secrets:
+  netbox_token:
+    file: ${ZTP_NETBOX_TOKEN_PATH:-./secrets/netbox_token}

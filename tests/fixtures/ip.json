@@ -1,0 +1,4 @@
+{
+  "id": 10, "address": "192.0.2.10/24", "assigned_object_type": "dcim.interface",
+  "assigned_object": {"id": 20, "name": "mgmt0", "device": {"id": 1}}
+}

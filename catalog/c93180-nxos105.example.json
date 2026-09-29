@@ -1,0 +1,15 @@
+[
+  {
+    "id": "c93180-105-lab-example",
+    "model": "N9K-C93180YC-FX3",
+    "source_versions": [
+      "10.5(2)F"
+    ],
+    "target_version": "10.5(2)F",
+    "image_name": "REPLACE-approved-nxos-10.5.bin",
+    "image_checksum": "0000000000000000000000000000000000000000000000000000000000000000",
+    "image_size_bytes": 1,
+    "hardware_qualified": false,
+    "replay_method": "scheduled-config-exit"
+  }
+]
