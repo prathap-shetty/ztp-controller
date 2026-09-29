@@ -25,7 +25,7 @@ def device_event(engine, attempt_id: str, event: DeviceEvent):
         attempt = session.scalar(select(Attempt).where(Attempt.id == attempt_id).with_for_update())
         if (
             not attempt
-            or attempt.manifest["mode"] != "configuration-only"
+            or attempt.manifest["mode"] == "planning-only"
             or event.config_sha256 != attempt.manifest["config"]["sha256"]
         ):
             raise ZtpError("invalid_event", 409, "Event does not match the configuration attempt")
@@ -36,7 +36,10 @@ def device_event(engine, attempt_id: str, event: DeviceEvent):
             return {"state": attempt.state, "duplicate": True}
         if attempt.state in {"FAILED", "VALIDATED"}:
             raise ZtpError("terminal_attempt", 409, "Attempt is terminal")
-        if event.event == "CONFIG_STAGED":
+        if event.event == "IMAGE_VERIFIED":
+            if attempt.manifest["mode"] != "upgrade-and-configure":
+                raise ZtpError("invalid_event", 409, "Not an upgrade attempt")
+        elif event.event == "CONFIG_STAGED":
             if attempt.state == "AUTHORIZED":
                 attempt.state = "CONFIGURING"
         else:

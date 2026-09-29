@@ -86,12 +86,14 @@ class CompatibilityProfile(Contract):
     model: Token
     source_versions: list[Token] = Field(min_length=1)
     target_version: Token
-    image_name: str
+    image_name: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.bin$", max_length=200)]
     image_checksum: Digest
     image_size_bytes: int = Field(gt=0)
     # Planning support is not hardware qualification or authorization to install.
     hardware_qualified: bool = False
     replay_method: Literal["scheduled-config-exit"] | None = None
+    install_method: Literal["poap-install-no-reload"] | None = None
+    upgrade_path_approved: bool = False
 
 
 class ConfigArtifact(Contract):
@@ -101,15 +103,15 @@ class ConfigArtifact(Contract):
 
 class DeviceEvent(Contract):
     event_id: Annotated[str, Field(pattern=r"^[a-f0-9-]{36}$")]
-    event: Literal["CONFIG_STAGED", "FAILED"]
+    event: Literal["CONFIG_STAGED", "IMAGE_VERIFIED", "FAILED"]
     config_sha256: Digest
 
 
 class Manifest(Contract):
     schema_version: Literal[1] = 1
-    mode: Literal["planning-only", "configuration-only"] = "planning-only"
+    mode: Literal["planning-only", "configuration-only", "upgrade-and-configure"] = "planning-only"
     execution_enabled: bool = False
-    actions: tuple[Literal["stage-config"], ...] = ()
+    actions: tuple[Literal["download-image", "install-image", "stage-config"], ...] = ()
     device_id: str
     serial_number: str
     intent_hash: Digest
@@ -126,6 +128,19 @@ class Manifest(Contract):
         if self.mode == "planning-only":
             if self.execution_enabled or self.actions or self.config is not None:
                 raise ValueError("Planning manifests cannot execute")
+        elif self.mode == "upgrade-and-configure":
+            expected = (
+                ("download-image", "install-image", "stage-config")
+                if self.upgrade_required
+                else ("stage-config",)
+            )
+            if not self.execution_enabled or self.config is None or self.actions != expected:
+                raise ValueError("Invalid upgrade execution manifest")
+            if (
+                self.compatibility_profile.install_method != "poap-install-no-reload"
+                or not self.compatibility_profile.upgrade_path_approved
+            ):
+                raise ValueError("Upgrade path must be explicitly approved")
         elif (
             not self.execution_enabled
             or self.actions != ("stage-config",)
@@ -151,4 +166,4 @@ class StatusResponse(Contract):
     provisioning_id: str
     state: str
     plan_hash: Digest
-    mode: Literal["planning-only", "configuration-only"] = "planning-only"
+    mode: Literal["planning-only", "configuration-only", "upgrade-and-configure"] = "planning-only"

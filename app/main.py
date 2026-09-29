@@ -3,7 +3,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -16,6 +16,7 @@ from app.persistence.models import Attempt, ValidationJob
 from app.persistence.repository import Repository
 from app.services.authorization import authorize_identity, authorize_intent
 from app.services.hashing import stable_hash
+from app.services.images import open_image
 from app.services.rendering import configuration_manifest
 from app.services.workflow import device_event
 from app.settings import Settings
@@ -75,7 +76,7 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
     @app.get("/health")
     def health(request: Request):
         mode = request.app.state.config.execution_mode
-        return {"status": "ok", "mode": mode, "execution_enabled": mode == "configuration-only"}
+        return {"status": "ok", "mode": mode, "execution_enabled": mode != "planning-only"}
 
     @app.get("/ready")
     def ready(request: Request):
@@ -105,8 +106,12 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
             manifest,
             state.config.status_token_ttl_seconds,
             config_body,
-            state.config.validation_delay_seconds,
-            state.config.validation_deadline_seconds,
+            state.config.upgrade_validation_delay_seconds
+            if manifest.upgrade_required
+            else state.config.validation_delay_seconds,
+            state.config.upgrade_deadline_seconds
+            if manifest.upgrade_required
+            else state.config.validation_deadline_seconds,
         )
 
     @app.get("/api/v1/ztp/status/{provisioning_id}", response_model=StatusResponse)
@@ -135,8 +140,8 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
             raise ZtpError("invalid_status_token", 401, "Attempt token required")
         attempt = request.app.state.repository.status(str(attempt_id), credentials.credentials)
         if (
-            request.app.state.config.execution_mode != "configuration-only"
-            or attempt.manifest["mode"] != "configuration-only"
+            request.app.state.config.execution_mode == "planning-only"
+            or attempt.manifest["mode"] != request.app.state.config.execution_mode
         ):
             raise ZtpError("execution_disabled", 403, "Configuration execution is disabled")
         intent = request.app.state.inventory.get_device_intent(attempt.device_id)
@@ -158,6 +163,37 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
             content=attempt.config_body,
             media_type="text/plain",
             headers={"X-Content-SHA256": attempt.manifest["config"]["sha256"]},
+        )
+
+    @app.get("/api/v1/ztp/image/{provisioning_id}")
+    def image_artifact(
+        provisioning_id: UUID,
+        request: Request,
+        credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    ):
+        attempt = authorized_config_attempt(request, provisioning_id, credentials)
+        if attempt.manifest["mode"] != "upgrade-and-configure" or attempt.state in {
+            "FAILED",
+            "VALIDATED",
+        }:
+            raise ZtpError("artifact_unavailable", 409, "Image unavailable")
+        profile = attempt.manifest["compatibility_profile"]
+        handle = open_image(request.app.state.config.image_directory, profile)
+
+        def chunks():
+            try:
+                while chunk := handle.read(1024 * 1024):
+                    yield chunk
+            finally:
+                handle.close()
+
+        return StreamingResponse(
+            chunks(),
+            media_type="application/octet-stream",
+            headers={
+                "Content-Length": str(profile["image_size_bytes"]),
+                "X-Content-SHA256": profile["image_checksum"],
+            },
         )
 
     @app.post("/api/v1/ztp/status/{provisioning_id}")

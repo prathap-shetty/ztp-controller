@@ -104,3 +104,23 @@ full M2a replay remains unqualified. Exact hardware/release and the failure caus
 are not established. See the [lab examples](../examples/lab-192.168.0.95/README.md)
 and [evidence](dev-server-192.168.0.95.md). This does not establish image installation,
 which M2a does not implement.
+
+## 2026-09-29 M2b upgrade implementation
+
+Added opt-in image upgrade mode, authenticated streaming from a read-only host
+folder, actual-file catalog generator, bounded bootflash download and checksum,
+native no-reload install/checkpoint handling, target-version registration recovery,
+and delayed durable post-reboot validation. Defaults remain planning-only. See
+[m2b-upgrade-lab-guide.md](m2b-upgrade-lab-guide.md) for exact limitations and setup.
+Earlier statements that image installation is unimplemented describe M2a history.
+Physical upgrade qualification and Cisco matrix approval remain outstanding.
+
+## Local YAML inventory
+
+Added explicitly selected, read-only local YAML inventory for all three execution
+modes, including live rereads for authorization and worker validation. NetBox is
+still the default; local mode does not construct a NetBox client or require its
+credentials. `compose.local.yaml` removes NetBox service secret references. See
+[local-yaml-inventory.md](local-yaml-inventory.md). Earlier statements that NetBox
+is mandatory describe the previous implementation. This adds structured inventory,
+not serial-named raw configuration-file fallback.

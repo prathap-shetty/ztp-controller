@@ -1,0 +1,24 @@
+schema_version: 1
+devices:
+  - device:
+      id: "lab-leaf-01"
+      name: lab-leaf-01
+      serial_number: REPLACE_WITH_REAL_SERIAL
+      vendor: cisco
+      platform: nxos
+      model: N9K-C93180YC-FX3
+      status: staged
+    ztp_enabled: false # Set true only after replacing all example values.
+    management:
+      address: 10.10.10.100/24
+      gateway: 10.10.10.1
+      vrf: management
+      interface: mgmt0
+    software:
+      target_version: "10.5(4)M"
+      image_name: nxos64-cs.10.5.4.M.bin
+      image_checksum: "0000000000000000000000000000000000000000000000000000000000000000"
+    initial_configuration:
+      dns_servers: []
+      ntp_servers: []
+      ssh_sources: [10.10.10.0/24]

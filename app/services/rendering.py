@@ -60,7 +60,12 @@ def configuration_manifest(
     if settings.execution_mode == "planning-only":
         return manifest, None
     profile = manifest.compatibility_profile
-    if manifest.upgrade_required:
+    upgrading = settings.execution_mode == "upgrade-and-configure"
+    if upgrading and (
+        not profile.upgrade_path_approved or profile.install_method != "poap-install-no-reload"
+    ):
+        raise ZtpError("upgrade_not_approved", 403, "Upgrade path requires explicit approval")
+    if manifest.upgrade_required and not upgrading:
         raise ZtpError("target_version_required", 409, "M2a requires the running target version")
     if profile.replay_method != "scheduled-config-exit":
         raise ZtpError("replay_not_qualified", 403, "No supported replay method configured")
@@ -69,9 +74,13 @@ def configuration_manifest(
     config, template_hash = render_configuration(intent, settings)
     payload = manifest.model_dump(mode="json")
     payload.update(
-        mode="configuration-only",
+        mode=settings.execution_mode,
         execution_enabled=True,
-        actions=["stage-config"],
+        actions=(
+            ["download-image", "install-image", "stage-config"]
+            if upgrading and manifest.upgrade_required
+            else ["stage-config"]
+        ),
         config=ConfigArtifact(
             sha256=hashlib.sha256(config.encode()).hexdigest(), size_bytes=len(config.encode())
         ).model_dump(),

@@ -162,3 +162,20 @@ The [reproducible lab examples](examples/lab-192.168.0.95/README.md) include the
 working ens3 DHCP settings, sanitized environment file, bootstrap release commands
 and switch-console evidence. DHCP, HTTP download and MD5 validation passed;
 script execution and full provisioning remain unqualified.
+
+## Image upgrade lab (M2b)
+
+The opt-in `upgrade-and-configure` mode adds authenticated image streaming from a
+read-only host folder, bootflash SHA-256 verification, native POAP installation and
+post-reboot validation. See the [upgrade lab guide](docs/m2b-upgrade-lab-guide.md).
+The N9K-C93180YC-FX3 10.4(4) → 10.5(4)M path still requires Cisco matrix approval
+and physical qualification. No real-device upgrade has been performed.
+
+## Local inventory without NetBox
+
+Set `ZTP_INVENTORY_PROVIDER=local-yaml` and use
+`docker compose -f compose.yaml -f compose.local.yaml ...` to remove NetBox secret
+requirements. Copy `inventory/devices.example.yaml` into your private inventory
+directory, replace its values, and mount it with `ZTP_LOCAL_INVENTORY_DIR`.
+See [local YAML inventory](docs/local-yaml-inventory.md) for the full setup and
+revocation behavior. The default local inventory is empty; no device is authorized.

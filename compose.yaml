@@ -6,12 +6,17 @@ x-app: &app
     dockerfile: deploy/docker/Dockerfile
   environment: &app-env
     ZTP_DATABASE_URL: postgresql+psycopg://ztp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ztp
+    ZTP_INVENTORY_PROVIDER: ${ZTP_INVENTORY_PROVIDER:-netbox}
+    ZTP_LOCAL_INVENTORY_PATH: /run/ztp-inventory/devices.yaml
     ZTP_NETBOX_URL: ${ZTP_NETBOX_URL:-https://netbox.example.invalid}
     ZTP_NETBOX_VERIFY_SSL: ${ZTP_NETBOX_VERIFY_SSL:-true}
     ZTP_NETBOX_TOKEN_FILE: /run/secrets/netbox_token
     ZTP_NETBOX_AUTH_SCHEME: ${ZTP_NETBOX_AUTH_SCHEME:-Token}
     ZTP_NETBOX_PLATFORM_SLUG: ${ZTP_NETBOX_PLATFORM_SLUG:-nxos}
     ZTP_ALLOW_HTTP_NETBOX: ${ZTP_ALLOW_HTTP_NETBOX:-false}
+    ZTP_IMAGE_DIRECTORY: /srv/images
+    ZTP_UPGRADE_VALIDATION_DELAY_SECONDS: ${ZTP_UPGRADE_VALIDATION_DELAY_SECONDS:-1800}
+    ZTP_UPGRADE_DEADLINE_SECONDS: ${ZTP_UPGRADE_DEADLINE_SECONDS:-7200}
     ZTP_CATALOG_PATH: /srv/ztp/catalog/profiles.json
     ZTP_EXECUTION_MODE: ${ZTP_EXECUTION_MODE:-planning-only}
     ZTP_ALLOW_UNQUALIFIED_LAB: ${ZTP_ALLOW_UNQUALIFIED_LAB:-false}
@@ -26,6 +31,7 @@ x-app: &app
   secrets:
     - netbox_token
   volumes:
+    - ${ZTP_LOCAL_INVENTORY_DIR:-./inventory}:/run/ztp-inventory:ro
     - ${ZTP_CATALOG_FILE:-./catalog/profiles.json}:/srv/ztp/catalog/profiles.json:ro
     - ${ZTP_SSH_PUBLIC_DIR:-./secrets/ssh-public}:/run/ztp-public:ro
   networks: [backend]
@@ -60,6 +66,11 @@ services:
 
   ztp-api:
     <<: *app
+    volumes:
+      - ${ZTP_LOCAL_INVENTORY_DIR:-./inventory}:/run/ztp-inventory:ro
+      - ${ZTP_CATALOG_FILE:-./catalog/profiles.json}:/srv/ztp/catalog/profiles.json:ro
+      - ${ZTP_SSH_PUBLIC_DIR:-./secrets/ssh-public}:/run/ztp-public:ro
+      - ${ZTP_IMAGE_DIR:-./images}:/srv/images:ro
     ports: ["127.0.0.1:${ZTP_API_PORT:-8000}:8000"]
     depends_on:
       migrate: {condition: service_completed_successfully}
@@ -74,6 +85,7 @@ services:
     <<: *app
     command: [python, -m, app.workers.maintenance]
     volumes:
+      - ${ZTP_LOCAL_INVENTORY_DIR:-./inventory}:/run/ztp-inventory:ro
       - ${ZTP_CATALOG_FILE:-./catalog/profiles.json}:/srv/ztp/catalog/profiles.json:ro
       - ${ZTP_SSH_PUBLIC_DIR:-./secrets/ssh-public}:/run/ztp-public:ro
       - ${ZTP_SSH_VALIDATION_DIR:-./secrets/ssh-validation}:/run/ztp-validation:ro

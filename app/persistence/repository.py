@@ -97,11 +97,28 @@ class Repository:
                     )
                 )
             attempt = session.scalar(select(Attempt).where(Attempt.device_id == intent.device.id))
+            resumed = False
+            if attempt is not None and attempt.manifest["mode"] == "upgrade-and-configure":
+                old = dict(attempt.observed)
+                old["current_version"] = observed.current_version
+                candidate = dict(plan)
+                candidate["upgrade_required"] = attempt.manifest["upgrade_required"]
+                candidate["actions"] = attempt.manifest["actions"]
+                resumed = (
+                    observed.current_version == attempt.manifest["target"]["target_version"]
+                    and old == observed.model_dump(mode="json")
+                    and candidate == attempt.manifest
+                )
             if (
                 attempt is None
                 or attempt.state in {"FAILED", "VALIDATED"}
-                or attempt.plan_hash != plan_hash
-                or attempt.observed != observed.model_dump(mode="json")
+                or (
+                    not resumed
+                    and (
+                        attempt.plan_hash != plan_hash
+                        or attempt.observed != observed.model_dump(mode="json")
+                    )
+                )
             ):
                 raise ZtpError("attempt_conflict", 409, "Existing attempt requires reconciliation")
             session.add(

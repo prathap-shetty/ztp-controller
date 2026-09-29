@@ -11,3 +11,6 @@ secrets/
 !deploy/secrets/
 deploy/bootstrap/
 deploy/tls/
+
+images/
+*.bin

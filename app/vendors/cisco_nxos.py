@@ -26,7 +26,13 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
             for p in self.profiles
             if (
                 p.model == observed.model
-                and observed.current_version in p.source_versions
+                and (
+                    observed.current_version in p.source_versions
+                    or (
+                        p.install_method is not None
+                        and observed.current_version == p.target_version
+                    )
+                )
                 and p.target_version == intent.software.target_version
                 and p.image_name == intent.software.image_name
                 and p.image_checksum == intent.software.image_checksum

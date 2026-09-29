@@ -6,3 +6,6 @@ secrets
 .pytest_cache
 .ruff_cache
 .DS_Store
+
+images/
+*.bin

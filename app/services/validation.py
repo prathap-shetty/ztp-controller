@@ -97,7 +97,9 @@ class SshValidator:
             ):
                 return "fatal", {"reason": "device_identity_mismatch"}
             if facts["current_version"] != claim["manifest"]["target"]["target_version"]:
-                return "fatal", {"reason": "running_version_mismatch"}
+                return (
+                    "retry" if claim["manifest"]["mode"] == "upgrade-and-configure" else "fatal"
+                ), {"reason": "running_version_mismatch"}
             running = configuration_matches(claim["config_body"], responses[2].result)
             saved = configuration_matches(claim["config_body"], responses[3].result)
             evidence = {
@@ -115,7 +117,7 @@ class SshValidator:
 
 
 def validate_once(engine, inventory, validator, settings):
-    if settings.execution_mode != "configuration-only":
+    if settings.execution_mode == "planning-only":
         return False
     claim = claim_validation(engine, settings.validation_lease_seconds)
     if claim is None:
