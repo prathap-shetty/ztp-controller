@@ -127,3 +127,30 @@ operator reconciliation; failed attempts are not automatically reset. No automat
 rollback, multi-hop upgrade, or concurrent-download batch scheduler is provided.
 EPLD is not managed. Existing PoC attempts also conflict if the shared admin password
 or desired intent is changed midway through provisioning.
+
+
+## PoC source-release bypass
+
+The PoC Compose file now defaults `ZTP_SKIP_SOURCE_VALIDATION=true`. Any running
+source version may match a profile for the exact model, target and image. Catalog
+`source_versions` entries are retained as reference metadata but are not enforced
+in this mode. The released bootstrap honors the same manifest policy. Set the
+variable to `false` in `.env.poc` to restore source matching. The standard controller
+still validates sources and rejects this bypass unless PoC mode is enabled.
+
+Keep one unambiguous profile per model/target/image when bypassing source matching:
+multiple entries differing only in their source lists will match simultaneously
+and be denied. NX-OS may still reject the installation; this does not implement
+intermediate upgrades or prove every source release is compatible.
+
+After updating, rebuild the PoC containers and regenerate the served script:
+
+```sh
+python3 scripts/release_bootstrap.py --controller http://10.10.10.1 \
+  --allow-http --output deploy/bootstrap
+sudo docker compose --env-file .env.poc -f compose.poc.yaml --profile dhcp up --build -d
+```
+
+Do not rerun the catalog helper just to release the script: it refuses to overwrite
+an existing catalog. Existing attempts may require reconciliation after policy/plan
+changes; perform this update before beginning a new attempt.

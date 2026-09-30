@@ -37,8 +37,12 @@ def test_upgrade_requires_explicit_approval(request):
 
 
 @pytest.mark.parametrize("fault", ["none", "install-error", "interrupted"])
-def test_install_order_and_no_blind_retry(upgrade, tmp_path, fault):
+@pytest.mark.parametrize("skip_source", [False, True])
+def test_install_order_and_no_blind_retry(upgrade, tmp_path, fault, skip_source):
     _, observed, manifest, body = upgrade
+    if skip_source:
+        observed = observed.model_copy(update={"current_version": "9.9(99)"})
+        manifest = manifest.model_copy(update={"source_validation_enabled": False})
     module = load_bootstrap()
     attempt = str(uuid.uuid4())
     calls = []
@@ -211,3 +215,22 @@ def test_target_boot_continues_install_checkpoint_without_reinstall(upgrade, tmp
         == 0
     )
     assert len(calls) == 1 and "scheduled-config" in calls[0]
+
+
+def test_source_bypass_keeps_model_and_image_matching(request):
+    from app.errors import InventoryDenied
+    from app.vendors.cisco_nxos import CiscoNxosAdapter
+
+    settings, intent, observed, _, _ = request.getfixturevalue("config_setup")
+    unknown = observed.model_copy(update={"current_version": "9.9(99)"})
+    with pytest.raises(InventoryDenied):
+        CiscoNxosAdapter(settings.catalog_path).build_manifest(intent, unknown)
+    adapter = CiscoNxosAdapter(settings.catalog_path, skip_source_validation=True)
+    manifest = adapter.build_manifest(intent, unknown)
+    assert manifest.source_validation_enabled is False
+    assert manifest.upgrade_required
+    with pytest.raises(InventoryDenied):
+        adapter.build_manifest(intent, unknown.model_copy(update={"model": "WRONG-MODEL"}))
+    software = intent.software.model_copy(update={"image_checksum": "0" * 64})
+    with pytest.raises(InventoryDenied):
+        adapter.build_manifest(intent.model_copy(update={"software": software}), unknown)

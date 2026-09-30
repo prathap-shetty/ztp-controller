@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     template_path: Path = Path("templates/cisco/nxos_initial.j2")
     bootstrap_path: Path = Path("poap/cisco/poap.py")
     poc_mode: bool = False
+    skip_source_validation: bool = False
     poc_admin_password: SecretStr | None = None
     ssh_public_key_file: Path | None = None
     ssh_private_key_file: Path | None = None
@@ -67,6 +68,8 @@ class Settings(BaseSettings):
             raise ValueError("Token TTL must be between 60 and 86400 seconds")
         if not 1 <= self.registration_limit_per_minute <= 10000:
             raise ValueError("Registration rate must be between 1 and 10000 per minute")
+        if self.skip_source_validation and not self.poc_mode:
+            raise ValueError("Source validation bypass requires PoC mode")
         if self.poc_mode:
             import re
 

@@ -26,15 +26,18 @@ def test_poc_no_keys_no_validation_jobs(records, netbox, settings, db, tmp_path)
         netbox_url="https://netbox.test",
         netbox_token="test-token",
         poc_mode=True,
+        skip_source_validation=True,
         poc_admin_password="LabPassword123",
         execution_mode="upgrade-and-configure",
         allow_unqualified_lab=True,
         catalog_path=catalog,
     )
+    records["observed"]["current_version"] = "9.9(99)"
     with TestClient(create_app(config, netbox[0], db)) as client:
         r = client.post("/api/v1/ztp/register", json=records["observed"])
         assert r.status_code == 200, r.text
         registration = r.json()
+        assert registration["manifest"]["source_validation_enabled"] is False
         assert registration["manifest"]["validation_policy"] == "manual"
         aid = registration["provisioning_id"]
         headers = {"Authorization": "Bearer " + registration["status_token"]}

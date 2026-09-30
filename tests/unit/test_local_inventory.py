@@ -103,3 +103,12 @@ def test_shipped_inventory_examples():
 def test_netbox_still_requires_credentials():
     with pytest.raises(ValueError):
         Settings(database_url="postgresql+psycopg://unused", netbox_url="https://netbox.test")
+
+
+def test_source_bypass_requires_poc():
+    with pytest.raises(ValueError, match="requires PoC"):
+        Settings(
+            database_url="postgresql+psycopg://unused",
+            inventory_provider="local-yaml",
+            skip_source_validation=True,
+        )

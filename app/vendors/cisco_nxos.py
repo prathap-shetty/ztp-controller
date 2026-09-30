@@ -10,7 +10,8 @@ from app.vendors.base import ZtpVendorAdapter
 
 
 class CiscoNxosAdapter(ZtpVendorAdapter):
-    def __init__(self, catalog_path: Path):
+    def __init__(self, catalog_path: Path, skip_source_validation: bool = False):
+        self.skip_source_validation = skip_source_validation
         self.profiles = TypeAdapter(list[CompatibilityProfile]).validate_python(
             json.loads(catalog_path.read_text())
         )
@@ -27,7 +28,8 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
             if (
                 p.model == observed.model
                 and (
-                    observed.current_version in p.source_versions
+                    self.skip_source_validation
+                    or observed.current_version in p.source_versions
                     or (
                         p.install_method is not None
                         and observed.current_version == p.target_version
@@ -41,6 +43,7 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
         if len(matches) != 1:
             raise InventoryDenied()
         return Manifest(
+            source_validation_enabled=not self.skip_source_validation,
             device_id=intent.device.id,
             serial_number=intent.device.serial_number,
             intent_hash=stable_hash(intent.model_dump(mode="json")),

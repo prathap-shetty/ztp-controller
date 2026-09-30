@@ -195,7 +195,8 @@ def run(cli, environ, bootflash="/bootflash", api=request, image_download=downlo
             )
         )
         or (
-            not target_running
+            manifest.get("source_validation_enabled", True)
+            and not target_running
             and observed["current_version"]
             not in manifest["compatibility_profile"]["source_versions"]
         )
