@@ -117,7 +117,7 @@ class SshValidator:
 
 
 def validate_once(engine, inventory, validator, settings):
-    if settings.execution_mode == "planning-only":
+    if settings.poc_mode or settings.execution_mode == "planning-only":
         return False
     claim = claim_validation(engine, settings.validation_lease_seconds)
     if claim is None:

@@ -9,3 +9,5 @@ secrets
 
 images/
 *.bin
+
+.env.poc

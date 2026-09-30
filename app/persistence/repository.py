@@ -85,7 +85,7 @@ class Repository:
                         id=str(uuid.uuid4()), attempt_id=inserted, kind="AUTHORIZED", created_at=now
                     )
                 )
-            if inserted and config_body is not None:
+            if inserted and config_body is not None and manifest.validation_policy == "ssh":
                 session.add(
                     ValidationJob(
                         attempt_id=inserted,

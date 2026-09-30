@@ -124,3 +124,13 @@ credentials. `compose.local.yaml` removes NetBox service secret references. See
 [local-yaml-inventory.md](local-yaml-inventory.md). Earlier statements that NetBox
 is mandatory describe the previous implementation. This adds structured inventory,
 not serial-named raw configuration-file fallback.
+
+## PoC v0.1 standalone stack
+
+`compose.poc.yaml` provides HTTP-only delivery with local YAML or NetBox, no
+certificate setup, no SSH key requirements and no validation worker. A minimal
+password-based switch configuration is rendered. Manifests/status explicitly say
+`validation_policy: manual`; CONFIG_STAGED is not treated as verified completion.
+The standard stack retains its existing key requirements and SSH validation.
+`scripts/prepare_poc.py` prepares a shared model/source catalog and HTTP bootstrap.
+See [poc-v0.1.md](poc-v0.1.md). Hardware upgrade qualification is still pending.

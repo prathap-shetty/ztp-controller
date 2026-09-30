@@ -1,0 +1,11 @@
+! ztp-controller PoC: manual console validation required
+hostname {{ hostname }}
+username admin password 0 {{ password }} role network-admin
+feature ssh
+no feature telnet
+vrf context management
+  ip route 0.0.0.0/0 {{ management.gateway }}
+interface mgmt0
+  vrf member management
+  ip address {{ management.address }}
+  no shutdown

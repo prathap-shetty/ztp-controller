@@ -131,6 +131,7 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
             state=attempt.state,
             plan_hash=attempt.plan_hash,
             mode=attempt.manifest["mode"],
+            validation_policy=attempt.manifest.get("validation_policy", "ssh"),
             failure_reason=attempt.failure_reason,
             validation=request.app.state.repository.validation_evidence(attempt.id),
         )

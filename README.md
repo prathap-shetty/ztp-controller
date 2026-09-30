@@ -179,3 +179,12 @@ requirements. Copy `inventory/devices.example.yaml` into your private inventory
 directory, replace its values, and mount it with `ZTP_LOCAL_INVENTORY_DIR`.
 See [local YAML inventory](docs/local-yaml-inventory.md) for the full setup and
 revocation behavior. The default local inventory is empty; no device is authorized.
+
+## Minimal PoC v0.1
+
+For an isolated new-build lab, [PoC v0.1](docs/poc-v0.1.md) uses standalone
+`compose.poc.yaml`: HTTP bootstrap/API, local YAML or NetBox, one fleet catalog,
+password-based switch configuration, and manual console validation. No TLS/SSH keys
+or known_hosts are required. Physical upgrade qualification is still pending.
+
+Start with the [step-by-step two-interface VM lab user guide](docs/poc-lab-user-guide.md).

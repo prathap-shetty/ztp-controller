@@ -14,3 +14,6 @@ deploy/tls/
 
 images/
 *.bin
+
+.env.poc
+catalog/poc.json

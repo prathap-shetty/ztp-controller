@@ -108,6 +108,7 @@ class DeviceEvent(Contract):
 
 
 class Manifest(Contract):
+    validation_policy: Literal["ssh", "manual"] = "ssh"
     schema_version: Literal[1] = 1
     mode: Literal["planning-only", "configuration-only", "upgrade-and-configure"] = "planning-only"
     execution_enabled: bool = False
@@ -161,6 +162,7 @@ class RegistrationResponse(Contract):
 
 
 class StatusResponse(Contract):
+    validation_policy: Literal["ssh", "manual"] = "ssh"
     failure_reason: str | None = None
     validation: dict | None = None
     provisioning_id: str

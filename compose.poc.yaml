@@ -1,0 +1,174 @@
+# Standalone PoC v0.1. HTTP and password login; manual validation.
+name: ztp-poc
+services:
+  postgres:
+    image: postgres:17-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0
+    environment:
+      POSTGRES_DB: ztp
+      POSTGRES_USER: ztp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+    - postgres-data:/var/lib/postgresql/data
+    networks:
+    - backend
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ztp -d ztp
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  migrate:
+    build: &id001
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+    environment:
+      ZTP_DATABASE_URL: postgresql+psycopg://ztp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD
+        in .env}@postgres:5432/ztp
+      ZTP_INVENTORY_PROVIDER: ${ZTP_INVENTORY_PROVIDER:-local-yaml}
+      ZTP_LOCAL_INVENTORY_PATH: /run/ztp-inventory/devices.yaml
+      ZTP_NETBOX_URL: ${ZTP_NETBOX_URL:-https://netbox.example.invalid}
+      ZTP_NETBOX_VERIFY_SSL: 'false'
+      ZTP_NETBOX_AUTH_SCHEME: ${ZTP_NETBOX_AUTH_SCHEME:-Token}
+      ZTP_NETBOX_PLATFORM_SLUG: ${ZTP_NETBOX_PLATFORM_SLUG:-nxos}
+      ZTP_ALLOW_HTTP_NETBOX: 'true'
+      ZTP_IMAGE_DIRECTORY: /srv/images
+      ZTP_UPGRADE_VALIDATION_DELAY_SECONDS: ${ZTP_UPGRADE_VALIDATION_DELAY_SECONDS:-1800}
+      ZTP_UPGRADE_DEADLINE_SECONDS: ${ZTP_UPGRADE_DEADLINE_SECONDS:-7200}
+      ZTP_CATALOG_PATH: /srv/ztp/catalog/profiles.json
+      ZTP_EXECUTION_MODE: upgrade-and-configure
+      ZTP_ALLOW_UNQUALIFIED_LAB: 'true'
+      ZTP_VALIDATION_DELAY_SECONDS: ${ZTP_VALIDATION_DELAY_SECONDS:-90}
+      ZTP_VALIDATION_DEADLINE_SECONDS: ${ZTP_VALIDATION_DEADLINE_SECONDS:-1800}
+      ZTP_VALIDATION_RETRY_SECONDS: ${ZTP_VALIDATION_RETRY_SECONDS:-30}
+      ZTP_VALIDATION_MAX_ATTEMPTS: ${ZTP_VALIDATION_MAX_ATTEMPTS:-30}
+      ZTP_POC_MODE: 'true'
+      ZTP_POC_ADMIN_PASSWORD: ${POC_ADMIN_PASSWORD:?Set POC_ADMIN_PASSWORD}
+      ZTP_NETBOX_TOKEN: ${ZTP_NETBOX_TOKEN:-}
+    volumes:
+    - ${ZTP_LOCAL_INVENTORY_DIR:-./inventory}:/run/ztp-inventory:ro
+    - ${ZTP_CATALOG_FILE:-./catalog/profiles.json}:/srv/ztp/catalog/profiles.json:ro
+    - ${ZTP_IMAGE_DIR:-./images}:/srv/images:ro
+    networks: &id002
+    - backend
+    security_opt: &id003
+    - no-new-privileges:true
+    cap_drop: &id004
+    - ALL
+    read_only: true
+    tmpfs: &id005
+    - /tmp
+    command:
+    - alembic
+    - upgrade
+    - head
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+  ztp-api:
+    build: *id001
+    environment:
+      ZTP_DATABASE_URL: postgresql+psycopg://ztp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD
+        in .env}@postgres:5432/ztp
+      ZTP_INVENTORY_PROVIDER: ${ZTP_INVENTORY_PROVIDER:-local-yaml}
+      ZTP_LOCAL_INVENTORY_PATH: /run/ztp-inventory/devices.yaml
+      ZTP_NETBOX_URL: ${ZTP_NETBOX_URL:-https://netbox.example.invalid}
+      ZTP_NETBOX_VERIFY_SSL: 'false'
+      ZTP_NETBOX_AUTH_SCHEME: ${ZTP_NETBOX_AUTH_SCHEME:-Token}
+      ZTP_NETBOX_PLATFORM_SLUG: ${ZTP_NETBOX_PLATFORM_SLUG:-nxos}
+      ZTP_ALLOW_HTTP_NETBOX: 'true'
+      ZTP_IMAGE_DIRECTORY: /srv/images
+      ZTP_UPGRADE_VALIDATION_DELAY_SECONDS: ${ZTP_UPGRADE_VALIDATION_DELAY_SECONDS:-1800}
+      ZTP_UPGRADE_DEADLINE_SECONDS: ${ZTP_UPGRADE_DEADLINE_SECONDS:-7200}
+      ZTP_CATALOG_PATH: /srv/ztp/catalog/profiles.json
+      ZTP_EXECUTION_MODE: upgrade-and-configure
+      ZTP_ALLOW_UNQUALIFIED_LAB: 'true'
+      ZTP_VALIDATION_DELAY_SECONDS: ${ZTP_VALIDATION_DELAY_SECONDS:-90}
+      ZTP_VALIDATION_DEADLINE_SECONDS: ${ZTP_VALIDATION_DEADLINE_SECONDS:-1800}
+      ZTP_VALIDATION_RETRY_SECONDS: ${ZTP_VALIDATION_RETRY_SECONDS:-30}
+      ZTP_VALIDATION_MAX_ATTEMPTS: ${ZTP_VALIDATION_MAX_ATTEMPTS:-30}
+      ZTP_POC_MODE: 'true'
+      ZTP_POC_ADMIN_PASSWORD: ${POC_ADMIN_PASSWORD:?Set POC_ADMIN_PASSWORD}
+      ZTP_NETBOX_TOKEN: ${ZTP_NETBOX_TOKEN:-}
+    volumes:
+    - ${ZTP_LOCAL_INVENTORY_DIR:-./inventory}:/run/ztp-inventory:ro
+    - ${ZTP_CATALOG_FILE:-./catalog/profiles.json}:/srv/ztp/catalog/profiles.json:ro
+    - ${ZTP_IMAGE_DIR:-./images}:/srv/images:ro
+    networks: *id002
+    security_opt: *id003
+    cap_drop: *id004
+    read_only: true
+    tmpfs: *id005
+    ports:
+    - 127.0.0.1:${ZTP_API_PORT:-8000}:8000
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health',
+        timeout=2)
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+  nginx:
+    image: nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    user: 101:101
+    entrypoint:
+    - nginx
+    - -g
+    - daemon off;
+    ports:
+    - ${ZTP_BIND_ADDRESS:-10.10.10.1}:${ZTP_HTTP_PORT:-80}:8080
+    volumes:
+    - ./deploy/poc/nginx.conf:/etc/nginx/nginx.conf:ro
+    - ${ZTP_BOOTSTRAP_DIR:-./deploy/bootstrap}:/srv/bootstrap:ro
+    tmpfs:
+    - /tmp
+    read_only: true
+    cap_drop:
+    - ALL
+    security_opt:
+    - no-new-privileges:true
+    networks:
+    - backend
+    depends_on:
+      ztp-api:
+        condition: service_healthy
+    restart: unless-stopped
+  kea-dhcp4:
+    image: docker.cloudsmith.io/isc/docker/kea-dhcp4@sha256:9c67ace6719e846cab3dcbac594530f6b45f3c6aa74be1ca41702bca2cfa3176
+    platform: linux/amd64
+    profiles:
+    - dhcp
+    network_mode: host
+    entrypoint:
+    - /bin/sh
+    - /opt/ztp/start-kea.sh
+    volumes:
+    - ${ZTP_KEA_CONFIG:-./deploy/poc/kea.json}:/etc/kea/kea-dhcp4.json:ro
+    - kea-leases:/var/lib/kea
+    - ./deploy/kea/start.sh:/opt/ztp/start-kea.sh:ro
+    tmpfs:
+    - /run
+    - /tmp
+    cap_drop:
+    - ALL
+    cap_add:
+    - NET_RAW
+    - NET_BIND_SERVICE
+    - DAC_OVERRIDE
+    security_opt:
+    - no-new-privileges:true
+    restart: unless-stopped
+networks:
+  backend: {}
+volumes:
+  postgres-data: {}
+  kea-leases: {}

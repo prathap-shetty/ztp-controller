@@ -2,6 +2,7 @@ import base64
 import hashlib
 import re
 import struct
+from pathlib import Path
 
 from jinja2 import Environment, StrictUndefined
 
@@ -11,9 +12,21 @@ from app.settings import Settings
 
 
 def render_configuration(intent: DeviceIntent, settings: Settings) -> tuple[str, str]:
-    if intent.initial_configuration is None:
-        raise InvalidIntent()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,62}", intent.device.name):
+        raise InvalidIntent()
+    if settings.poc_mode:
+        template = Path("templates/cisco/nxos_poc.j2").read_text()
+        rendered = (
+            Environment(undefined=StrictUndefined, autoescape=False)
+            .from_string(template)
+            .render(
+                hostname=intent.device.name,
+                password=settings.poc_admin_password.get_secret_value(),
+                management=intent.management.model_dump(mode="json"),
+            )
+        )
+        return rendered, hashlib.sha256(template.encode()).hexdigest()
+    if intent.initial_configuration is None:
         raise InvalidIntent()
     key = settings.ssh_public_key_file.read_text().strip().split()
     if len(key) < 2 or key[0] != "ssh-rsa":
@@ -75,6 +88,7 @@ def configuration_manifest(
     payload = manifest.model_dump(mode="json")
     payload.update(
         mode=settings.execution_mode,
+        validation_policy="manual" if settings.poc_mode else "ssh",
         execution_enabled=True,
         actions=(
             ["download-image", "install-image", "stage-config"]
