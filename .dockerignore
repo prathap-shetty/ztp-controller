@@ -11,3 +11,5 @@ images/
 *.bin
 
 .env.poc
+
+.env.poc.mac

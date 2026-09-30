@@ -188,3 +188,7 @@ password-based switch configuration, and manual console validation. No TLS/SSH k
 or known_hosts are required. Physical upgrade qualification is still pending.
 
 Start with the [step-by-step two-interface VM lab user guide](docs/poc-lab-user-guide.md).
+
+For a Mac USB Ethernet adapter, use the [en7 example](examples/mac-en7/README.md):
+`compose.poc.mac.yaml` runs HTTP/API/database in Docker Desktop while native dnsmasq
+serves DHCP on en7. Docker Desktop cannot expose en7 directly to the Kea container.

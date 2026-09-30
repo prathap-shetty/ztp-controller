@@ -17,3 +17,5 @@ images/
 
 .env.poc
 catalog/poc.json
+
+.env.poc.mac
