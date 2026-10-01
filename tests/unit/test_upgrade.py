@@ -126,7 +126,11 @@ def test_install_order_and_no_blind_retry(upgrade, tmp_path, fault, skip_source)
 def test_stream_download_integrity(tmp_path, monkeypatch, fault):
     module = load_bootstrap()
     data = b"image-data" * 10000
-    profile = {"image_checksum": hashlib.sha256(data).hexdigest(), "image_size_bytes": len(data)}
+    profile = {
+        "image_name": "nxos64-cs.10.5.4.M.bin",
+        "image_checksum": hashlib.sha256(data).hexdigest(),
+        "image_size_bytes": len(data),
+    }
     downloaded = (
         data if fault == "none" else (b"x" * len(data) if fault == "checksum" else data[:-1])
     )
@@ -140,6 +144,7 @@ def test_stream_download_integrity(tmp_path, monkeypatch, fault):
         assert not list(tmp_path.glob("*.part"))
     else:
         name = module.download_image(str(uuid.uuid4()), "test", profile, str(tmp_path))
+        assert name == profile["image_name"]
         assert (tmp_path / name).read_bytes() == data
         module.download_image(str(uuid.uuid4()), "test", profile, str(tmp_path))
         assert opener.open.call_count == 1
@@ -158,8 +163,17 @@ def test_image_endpoint_file_safety(tmp_path):
             open_image(tmp_path, {**profile, "image_name": name})
 
 
-def test_target_boot_continues_install_checkpoint_without_reinstall(upgrade, tmp_path):
+@pytest.mark.parametrize("reported_version", ["10.5(4)M", "10.5(4)", "10.5(5)"])
+def test_target_boot_continues_install_checkpoint_without_reinstall(
+    upgrade, tmp_path, reported_version
+):
     _, observed, manifest, body = upgrade
+    manifest = manifest.model_copy(
+        update={
+            "allow_newer_version": True,
+            "target": manifest.target.model_copy(update={"target_version": "10.5(4)M"}),
+        }
+    )
     module = load_bootstrap()
     attempt = str(uuid.uuid4())
     registration = {
@@ -182,7 +196,7 @@ def test_target_boot_continues_install_checkpoint_without_reinstall(upgrade, tmp
 
     def cli(command):
         if command == "show version | json":
-            return json.dumps({"nxos_ver_str": manifest.target.target_version})
+            return json.dumps({"nxos_ver_str": reported_version})
         if command == "show inventory | json":
             return json.dumps(
                 {
@@ -234,3 +248,63 @@ def test_source_bypass_keeps_model_and_image_matching(request):
     software = intent.software.model_copy(update={"image_checksum": "0" * 64})
     with pytest.raises(InventoryDenied):
         adapter.build_manifest(intent.model_copy(update={"software": software}), unknown)
+
+
+@pytest.mark.parametrize("name", ["../image.bin", "image.bin ; reload", "/image.bin", ""])
+def test_download_rejects_unsafe_image_name(tmp_path, name):
+    module = load_bootstrap()
+    profile = {"image_name": name, "image_checksum": "a" * 64, "image_size_bytes": 3}
+    with pytest.raises(RuntimeError, match="filename"):
+        module.download_image("test", "test", profile, str(tmp_path))
+
+
+def test_download_preserves_conflicting_existing_image(tmp_path):
+    module = load_bootstrap()
+    path = tmp_path / "nxos.bin"
+    path.write_bytes(b"old")
+    profile = {"image_name": path.name, "image_checksum": "a" * 64, "image_size_bytes": 3}
+    with pytest.raises(RuntimeError, match="no files were overwritten"):
+        module.download_image("test", "test", profile, str(tmp_path))
+    assert path.read_bytes() == b"old"
+
+
+@pytest.mark.parametrize(
+    "left,right,expected",
+    [
+        ("10.5(4)", "10.5(4)M", True),
+        ("10.5(4)M", "10.5(4)", True),
+        ("10.5(3)", "10.5(4)M", False),
+        ("10.5(4)F", "10.5(4)M", False),
+        ("9.3(3)", "9.3(3)M", False),
+    ],
+)
+def test_release_alias_consistent_with_bootstrap(left, right, expected):
+    from app.vendors.nxos_version import same_nxos_release
+
+    assert same_nxos_release(left, right) is expected
+    assert load_bootstrap().same_nxos_release(left, right) is expected
+
+
+@pytest.mark.parametrize(
+    "current,target,expected",
+    [
+        ("10.5(4)", "10.5(4)M", True),
+        ("10.5(5)", "10.5(4)M", True),
+        ("10.6(1)", "10.5(4)M", True),
+        ("10.4(2)", "10.5(4)M", False),
+    ],
+)
+def test_minimum_version_policy(current, target, expected):
+    from app.vendors.nxos_version import version_satisfies
+
+    assert version_satisfies(current, target, True) is expected
+    assert load_bootstrap().version_satisfies(current, target, True) is expected
+    if current == "10.5(5)":
+        assert not version_satisfies(current, target, False)
+
+
+def test_unknown_newer_version_is_not_downgraded():
+    from app.vendors.nxos_version import version_satisfies
+
+    with pytest.raises(ValueError):
+        version_satisfies("10.5(5)X", "10.5(4)M", True)

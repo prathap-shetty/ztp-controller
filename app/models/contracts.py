@@ -108,6 +108,7 @@ class DeviceEvent(Contract):
 
 
 class Manifest(Contract):
+    allow_newer_version: bool = False
     source_validation_enabled: bool = True
     validation_policy: Literal["ssh", "manual"] = "ssh"
     schema_version: Literal[1] = 1

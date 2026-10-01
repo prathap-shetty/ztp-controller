@@ -17,6 +17,7 @@ from app.persistence.models import (
     ValidationJob,
 )
 from app.services.hashing import stable_hash
+from app.vendors.nxos_version import version_satisfies
 
 
 def digest_token(token: str) -> str:
@@ -105,7 +106,11 @@ class Repository:
                 candidate["upgrade_required"] = attempt.manifest["upgrade_required"]
                 candidate["actions"] = attempt.manifest["actions"]
                 resumed = (
-                    observed.current_version == attempt.manifest["target"]["target_version"]
+                    version_satisfies(
+                        observed.current_version,
+                        attempt.manifest["target"]["target_version"],
+                        attempt.manifest.get("allow_newer_version", False),
+                    )
                     and old == observed.model_dump(mode="json")
                     and candidate == attempt.manifest
                 )

@@ -35,7 +35,9 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
         app.state.db = db
         app.state.inventory = inventory
         app.state.adapter = CiscoNxosAdapter(
-            config.catalog_path, skip_source_validation=config.skip_source_validation
+            config.catalog_path,
+            skip_source_validation=config.skip_source_validation,
+            allow_newer_version=config.allow_newer_version,
         )
         app.state.repository = Repository(db)
         try:

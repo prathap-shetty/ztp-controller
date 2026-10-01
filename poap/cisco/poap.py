@@ -76,13 +76,47 @@ def request(path, data=None, token=None):
     raise RuntimeError("Retry budget exhausted")
 
 
+def same_nxos_release(left, right):
+    """Accept the NX-OS 10.5 maintenance suffix omitted by show version."""
+
+    def canonical(value):
+        return re.sub(r"^(10\.5\([0-9]+\))M$", r"\1", value.strip())
+
+    return canonical(left) == canonical(right)
+
+
+def version_satisfies(current, target, allow_newer=False):
+    if same_nxos_release(current, target):
+        return True
+    if not allow_newer:
+        return False
+
+    # Compare numeric NX-OS releases only; unknown suffixes are not ordered.
+    def parts(value):
+        match = re.fullmatch(r"(\d+)\.(\d+)\((\d+)\)(?:M)?", value.strip())
+        return tuple(map(int, match.groups())) if match else None
+
+    actual, desired = parts(current), parts(target)
+    if actual is None or desired is None:
+        raise ValueError(
+            "Cannot order this NX-OS release; use an explicit supported release policy"
+        )
+    return actual > desired
+
+
 def download_image(attempt_id, token, profile, bootflash):
     """Bounded-memory download; install only after a full size/SHA-256 check."""
     digest = profile["image_checksum"]
     size = profile["image_size_bytes"]
     if not re.fullmatch(r"[a-f0-9]{64}", digest) or not isinstance(size, int) or size <= 0:
         raise RuntimeError("Invalid image metadata")
-    name = "ztp-image-" + digest + ".bin"
+    name = profile.get("image_name", "")
+    if (
+        not isinstance(name, str)
+        or len(name) > 200
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.bin", name)
+    ):
+        raise RuntimeError("Invalid image filename")
     path = os.path.join(bootflash, name)
 
     def valid():
@@ -94,8 +128,12 @@ def download_image(attempt_id, token, profile, bootflash):
                 h.update(chunk)
         return h.hexdigest() == digest
 
+    if os.path.islink(path) or os.path.islink(path + ".part"):
+        raise RuntimeError("Image path must not be a symlink")
     if valid():
         return name
+    if os.path.lexists(path):
+        raise RuntimeError("Existing image differs from approved image; no files were overwritten")
     space = os.statvfs(bootflash)
     if space.f_bavail * space.f_frsize < size + 256 * 1024 * 1024:
         raise RuntimeError("Insufficient bootflash space; no files were deleted")
@@ -176,7 +214,11 @@ def run(cli, environ, bootflash="/bootflash", api=request, image_download=downlo
     registration = json.loads(api("/api/v1/ztp/register", observed))
     manifest = registration["manifest"]
     upgrading = manifest["mode"] == "upgrade-and-configure"
-    target_running = manifest["target"]["target_version"] == observed["current_version"]
+    target_running = version_satisfies(
+        observed["current_version"],
+        manifest["target"]["target_version"],
+        manifest.get("allow_newer_version", False),
+    )
     expected_actions = (
         ["download-image", "install-image", "stage-config"]
         if upgrading and manifest["upgrade_required"]
@@ -197,8 +239,10 @@ def run(cli, environ, bootflash="/bootflash", api=request, image_download=downlo
         or (
             manifest.get("source_validation_enabled", True)
             and not target_running
-            and observed["current_version"]
-            not in manifest["compatibility_profile"]["source_versions"]
+            and not any(
+                same_nxos_release(observed["current_version"], v)
+                for v in manifest["compatibility_profile"]["source_versions"]
+            )
         )
         or manifest["serial_number"] != observed["serial_number"]
         or manifest["compatibility_profile"]["model"] != observed["model"]

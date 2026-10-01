@@ -337,3 +337,45 @@ sudo docker compose --env-file .env.poc -f compose.poc.yaml --profile dhcp up --
 Do not rerun the catalog helper just to release the script: it refuses to overwrite
 an existing catalog. Existing attempts may require reconciliation after policy/plan
 changes; perform this update before beginning a new attempt.
+
+## Reprovision after write erase
+
+The PoC Compose builds now default to `ZTP_ALLOW_NEWER_VERSION=true`. An equal or
+newer installed release gets configuration only; an older release follows the
+approved upgrade path. `10.5(4)` and `10.5(4)M` are equivalent. Ordering supports
+numeric `major.minor(patch)` releases with an optional `M`; unrecognized suffixes
+are rejected rather than guessed. Set the option to `false` for exact-target
+behavior. This is release ordering, not a Cisco compatibility qualification.
+
+A switch erase does not erase the controller database or necessarily remove
+bootflash checkpoints. Explicitly prepare each erased switch for a fresh attempt.
+Do this only after the previous installation has finished and the device has been
+erased; never reset an attempt while its installation is running.
+
+For the Mac lab (replace `REAL-SERIAL` with the chassis serial in your inventory):
+
+```bash
+# Update the code first, then build and release the new bootstrap.
+docker compose --env-file .env.poc.mac -f compose.poc.mac.yaml build
+python3 scripts/release_bootstrap.py --controller http://10.10.10.1 --allow-http --output deploy/bootstrap
+
+# Stop registration while archiving the previous attempt. Keep PostgreSQL running.
+docker compose --env-file .env.poc.mac -f compose.poc.mac.yaml stop ztp-api
+docker compose --env-file .env.poc.mac -f compose.poc.mac.yaml run --rm --no-deps ztp-api python -m app.reprovision --serial REAL-SERIAL --confirm-erased
+docker compose --env-file .env.poc.mac -f compose.poc.mac.yaml up -d ztp-api nginx
+```
+
+For Linux use `--env-file .env.poc -f compose.poc.yaml` instead. Keep the same
+Compose project and database volume. Run the reset once for each deliberate
+erase/reprovision cycle; normal POAP retries must reuse their current attempt.
+
+The command archives the previous attempt under its UUID, preserves its original
+identity in the recorded intent/observations, records `OPERATOR_REPROVISION`, and
+revokes its tokens. The archived row has state `FAILED` with reason
+`operator_reprovision` (an operator reset, not an installation failure). The next
+registration creates a fresh attempt ID, so previous bootflash checkpoints are
+ignored without deleting any images or files. Inventory authorization still
+applies. No matching attempt produces an error without changing the database.
+
+For target `10.5(4)M`: running `10.4(2)` upgrades; running `10.5(4)` or `10.5(5)`
+only stages configuration. An already-installed image is not renamed.

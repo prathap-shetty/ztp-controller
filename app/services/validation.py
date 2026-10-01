@@ -9,6 +9,7 @@ from app.models.contracts import ObservedDevice
 from app.services.authorization import authorize_intent
 from app.services.hashing import stable_hash
 from app.services.workflow import claim_validation, finish_validation
+from app.vendors.nxos_version import version_satisfies
 
 
 def nxos_facts(version: dict, inventory: dict) -> dict:
@@ -96,7 +97,11 @@ class SshValidator:
                 or facts["model"] != observed["model"]
             ):
                 return "fatal", {"reason": "device_identity_mismatch"}
-            if facts["current_version"] != claim["manifest"]["target"]["target_version"]:
+            if not version_satisfies(
+                facts["current_version"],
+                claim["manifest"]["target"]["target_version"],
+                claim["manifest"].get("allow_newer_version", False),
+            ):
                 return (
                     "retry" if claim["manifest"]["mode"] == "upgrade-and-configure" else "fatal"
                 ), {"reason": "running_version_mismatch"}

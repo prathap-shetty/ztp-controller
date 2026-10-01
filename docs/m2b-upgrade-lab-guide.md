@@ -23,7 +23,7 @@ EPLD upgrade manager, or an automatic multi-hop/rollback engine.
    Existing nonmatching images and unrelated bootflash files are not deleted.
 4. Record IMAGE_VERIFIED on the controller after rechecking live authorization.
    Persist an `installing` bootflash checkpoint and invoke:
-   `terminal dont-ask ; install all nxos bootflash:<digest-named-image> no-reload non-interruptive`.
+   `terminal dont-ask ; install all nxos bootflash:<original-image-name> no-reload non-interruptive`.
    This follows the no-reload command form in Cisco's POAP sample; its behavior on
    this exact hardware/release remains a physical acceptance requirement. It is not
    a promise of non-disruptive operation. No override, direct reload, or write erase
@@ -119,3 +119,27 @@ modes. Do not deploy this change midway through a provisioning attempt.
 The Cisco sample also contains destructive operations not adopted here. This is an
 original implementation with a narrower lifecycle; source review is not hardware
 qualification. It requires the full native lifecycle test above.
+
+### Image filenames on bootflash
+
+New POAP downloads preserve the catalog's `image_name`, for example
+`bootflash:nxos64-cs.10.5.4.M.bin`. Size and SHA-256 checks still apply. An existing
+matching file is reused; a conflicting file with the same name stops provisioning
+without overwriting it. Previously installed `ztp-image-<sha256>.bin` files and boot
+references are not renamed by this change.
+
+After updating the repository, regenerate the served bootstrap for the HTTP PoC:
+
+```bash
+python3 scripts/release_bootstrap.py --controller http://10.10.10.1 --allow-http --output deploy/bootstrap
+```
+
+This affects future image downloads; it does not change an already provisioned switch.
+
+NX-OS 10.5 release comparisons accept the optional maintenance `M` suffix:
+`10.5(4)` reported by the switch matches catalog target `10.5(4)M`. Other train
+suffixes and different release numbers remain distinct. Rebuild the API and
+regenerate the bootstrap when updating. A write erase does not clear controller
+attempts or necessarily remove bootflash checkpoints; a staged checkpoint can
+skip configuration replay on a reused attempt. Reprovisioning after an erase
+requires separate reconciliation of that attempt and checkpoint.

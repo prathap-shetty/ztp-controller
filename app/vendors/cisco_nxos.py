@@ -7,10 +7,17 @@ from app.errors import InventoryDenied
 from app.models.contracts import CompatibilityProfile, DeviceIntent, Manifest, ObservedDevice
 from app.services.hashing import stable_hash
 from app.vendors.base import ZtpVendorAdapter
+from app.vendors.nxos_version import same_nxos_release, version_satisfies
 
 
 class CiscoNxosAdapter(ZtpVendorAdapter):
-    def __init__(self, catalog_path: Path, skip_source_validation: bool = False):
+    def __init__(
+        self,
+        catalog_path: Path,
+        skip_source_validation: bool = False,
+        allow_newer_version: bool = False,
+    ):
+        self.allow_newer_version = allow_newer_version
         self.skip_source_validation = skip_source_validation
         self.profiles = TypeAdapter(list[CompatibilityProfile]).validate_python(
             json.loads(catalog_path.read_text())
@@ -22,6 +29,12 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
         return "nxos-poap"
 
     def build_manifest(self, intent: DeviceIntent, observed: ObservedDevice) -> Manifest:
+        try:
+            target_satisfied = version_satisfies(
+                observed.current_version, intent.software.target_version, self.allow_newer_version
+            )
+        except ValueError:
+            raise InventoryDenied() from None
         matches = [
             p
             for p in self.profiles
@@ -29,11 +42,10 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
                 p.model == observed.model
                 and (
                     self.skip_source_validation
-                    or observed.current_version in p.source_versions
-                    or (
-                        p.install_method is not None
-                        and observed.current_version == p.target_version
+                    or any(
+                        same_nxos_release(observed.current_version, v) for v in p.source_versions
                     )
+                    or (p.install_method is not None and target_satisfied)
                 )
                 and p.target_version == intent.software.target_version
                 and p.image_name == intent.software.image_name
@@ -43,6 +55,7 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
         if len(matches) != 1:
             raise InventoryDenied()
         return Manifest(
+            allow_newer_version=self.allow_newer_version,
             source_validation_enabled=not self.skip_source_validation,
             device_id=intent.device.id,
             serial_number=intent.device.serial_number,
@@ -50,5 +63,5 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
             compatibility_profile=matches[0],
             target=intent.software,
             management=intent.management,
-            upgrade_required=observed.current_version != intent.software.target_version,
+            upgrade_required=not target_satisfied,
         )

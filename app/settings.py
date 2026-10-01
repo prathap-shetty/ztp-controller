@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     template_path: Path = Path("templates/cisco/nxos_initial.j2")
     bootstrap_path: Path = Path("poap/cisco/poap.py")
     poc_mode: bool = False
+    allow_newer_version: bool = False
     skip_source_validation: bool = False
     poc_admin_password: SecretStr | None = None
     ssh_public_key_file: Path | None = None

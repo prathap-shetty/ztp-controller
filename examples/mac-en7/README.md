@@ -151,3 +151,5 @@ retries. Do not leave DHCP running when reconnecting en7 to another network.
 - [Docker Desktop networking](https://docs.docker.com/desktop/features/networking/)
 - [dnsmasq options](https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html)
 - [Homebrew dnsmasq](https://formulae.brew.sh/formula/dnsmasq)
+
+For a second run after erasing a switch, follow [Reprovision after write erase](../../docs/poc-lab-user-guide.md#reprovision-after-write-erase). This creates a fresh attempt and skips installation when the running release is equal to or newer than the target.
