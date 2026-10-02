@@ -379,3 +379,30 @@ applies. No matching attempt produces an error without changing the database.
 
 For target `10.5(4)M`: running `10.4(2)` upgrades; running `10.5(4)` or `10.5(5)`
 only stages configuration. An already-installed image is not renamed.
+
+## Web dashboard
+
+The PoC stack includes a read-only dashboard at `http://10.10.10.1/` (or
+`http://localhost:8001/` when using the example environment’s `ZTP_API_PORT=8001`;
+otherwise use your configured API port).
+Rebuild after updating, then recreate the API and nginx containers:
+
+```bash
+docker compose --env-file .env.poc.mac -f compose.poc.mac.yaml up -d --build ztp-api nginx
+```
+
+On Linux substitute `--env-file .env.poc -f compose.poc.yaml`.
+The page refreshes every ten seconds and shows current attempts, archived runs,
+source/target releases, management addresses and event timelines. Search by name,
+serial, model or IP. Local YAML entries appear before registration; NetBox mode
+shows registered devices only, with inventory editing remaining in NetBox.
+
+“Awaiting manual verification” means the switch reported configuration staging,
+not that the controller verified its running version or startup configuration.
+Image transfer percentages and rejected registration requests are not recorded
+in this view; use container logs for those. The view is limited to the latest 500
+attempts. It displays no configuration bodies, passwords or bearer tokens.
+
+The dashboard has no login in PoC mode and is accessible to clients that can
+reach the controller. Keep it on the isolated lab network. It is disabled in
+standard mode. Inventory edits and reprovisioning remain file/CLI operations.
