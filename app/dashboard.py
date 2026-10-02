@@ -2,11 +2,12 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.dashboard_auth import authenticated, login_page, require_dashboard
 from app.errors import ZtpError
 from app.inventory.local_yaml import LocalYamlInventoryProvider
 from app.persistence.models import Attempt, AttemptEvent
@@ -14,14 +15,10 @@ from app.persistence.models import Attempt, AttemptEvent
 router = APIRouter()
 
 
-def require_poc(request):
-    if not request.app.state.config.poc_mode:
-        raise HTTPException(404)
-
-
 @router.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
-    require_poc(request)
+    if not authenticated(request):
+        return login_page()
     return HTMLResponse(
         Path(__file__).with_name("dashboard.html").read_text(),
         headers={"X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY"},
@@ -30,7 +27,7 @@ def dashboard(request: Request):
 
 @router.get("/api/dashboard")
 def dashboard_data(request: Request):
-    require_poc(request)
+    require_dashboard(request)
     state = request.app.state
     with Session(state.db) as session:
         attempts = session.scalars(

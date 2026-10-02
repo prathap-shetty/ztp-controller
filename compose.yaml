@@ -5,6 +5,8 @@ x-app: &app
     context: .
     dockerfile: deploy/docker/Dockerfile
   environment: &app-env
+    ZTP_DASHBOARD_TOKEN: ${ZTP_DASHBOARD_TOKEN:-}
+    ZTP_DASHBOARD_SECURE_COOKIE: 'true'
     ZTP_DATABASE_URL: postgresql+psycopg://ztp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/ztp
     ZTP_INVENTORY_PROVIDER: ${ZTP_INVENTORY_PROVIDER:-netbox}
     ZTP_LOCAL_INVENTORY_PATH: /run/ztp-inventory/devices.yaml
