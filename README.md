@@ -1,3 +1,9 @@
+# ZTP Lite and Mac PoC
+
+**ZTP Lite** is the simple Linux deployment for a controlled management network: local YAML or NetBox, NX-OS upgrade and configuration, and a token-protected status dashboard. It keeps TLS and SSH host-key validation disabled and uses manual post-boot verification. See the [ZTP Lite user guide](docs/ztp-lite-user-guide.md). Use `compose.lite.yaml` with `.env.lite`.
+
+**Mac PoC** uses Docker Desktop and native DHCP on the USB-Ethernet adapter. See the [Mac PoC guide](examples/mac-en7/README.md).
+
 # ZTP controller
 
 Cisco NX-OS POAP controller with NetBox inventory, PostgreSQL workflow state and
@@ -180,9 +186,9 @@ directory, replace its values, and mount it with `ZTP_LOCAL_INVENTORY_DIR`.
 See [local YAML inventory](docs/local-yaml-inventory.md) for the full setup and
 revocation behavior. The default local inventory is empty; no device is authorized.
 
-## Minimal PoC v0.1
+## ZTP Lite (Linux)
 
-For an isolated new-build lab, [PoC v0.1](docs/poc-v0.1.md) uses standalone
+For an isolated new-build lab, [ZTP Lite](docs/ztp-lite.md) uses standalone
 `compose.poc.yaml`: HTTP bootstrap/API, local YAML or NetBox, one fleet catalog,
 password-based switch configuration, and manual console validation. No TLS/SSH keys
 or known_hosts are required. Physical upgrade qualification is still pending.

@@ -1,6 +1,5 @@
-# Compatibility entry point for the original Linux PoC project.
-# Standalone PoC v0.1. HTTP and password login; manual validation.
-name: ztp-poc
+# ZTP Lite: HTTP and password login; manual validation.
+name: ztp-lite
 services:
   postgres:
     image: postgres:17-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0

@@ -13,3 +13,5 @@ images/
 .env.poc
 
 .env.poc.mac
+
+.env.lite
