@@ -8,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.dashboard import router as dashboard_router
 from app.errors import InventoryDenied, ZtpError
 from app.inventory.factory import build_provider
 from app.models.contracts import DeviceEvent, ObservedDevice, RegistrationResponse, StatusResponse
@@ -211,4 +212,5 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
         authorized_config_attempt(request, provisioning_id, credentials)
         return device_event(request.app.state.db, str(provisioning_id), event)
 
+    app.include_router(dashboard_router)
     return app

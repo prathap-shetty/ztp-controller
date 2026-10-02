@@ -80,6 +80,9 @@ class LocalYamlInventoryProvider(InventoryProvider):
             raise InventoryDenied()
         return DeviceIntent.model_validate(matches[0].model_dump())
 
+    def list_entries(self):
+        return self._load().devices
+
     def check_ready(self):
         self._load()
 
