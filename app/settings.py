@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     allow_unqualified_lab: bool = False
     template_path: Path = Path("templates/cisco/nxos_initial.j2")
     bootstrap_path: Path = Path("poap/cisco/poap.py")
+    dashboard_token: SecretStr | None = None
+    dashboard_secure_cookie: bool = True
     poc_mode: bool = False
     allow_newer_version: bool = False
     skip_source_validation: bool = False
@@ -46,6 +48,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_configuration(self):
+        if self.dashboard_token and len(self.dashboard_token.get_secret_value()) < 24:
+            raise ValueError("Dashboard token must contain at least 24 characters")
         if self.inventory_provider == "netbox":
             url = urlsplit(self.netbox_url)
             if (
