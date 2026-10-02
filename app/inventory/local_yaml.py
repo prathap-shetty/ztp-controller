@@ -71,13 +71,15 @@ class LocalYamlInventoryProvider(InventoryProvider):
             r.device for r in self._load().devices if r.device.serial_number == serial.upper()
         ]
         if len(matches) != 1:
-            raise InventoryDenied()
+            raise InventoryDenied("serial_not_found", "Chassis serial was not found in inventory")
         return matches[0]
 
     def get_device_intent(self, device_id: str) -> DeviceIntent:
         matches = [r for r in self._load().devices if r.device.id == device_id]
-        if len(matches) != 1 or not matches[0].ztp_enabled:
-            raise InventoryDenied()
+        if len(matches) != 1:
+            raise InventoryDenied("device_not_found", "Device was not found in inventory")
+        if not matches[0].ztp_enabled:
+            raise InventoryDenied("ztp_disabled", "ZTP is not enabled for this device")
         return DeviceIntent.model_validate(matches[0].model_dump())
 
     def list_entries(self):

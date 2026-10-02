@@ -1,4 +1,4 @@
-"""Read-only operator dashboard for the isolated PoC stack."""
+"""Authenticated read-only operator dashboard."""
 
 from pathlib import Path
 
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.dashboard_auth import authenticated, login_page, require_dashboard
 from app.errors import ZtpError
 from app.inventory.local_yaml import LocalYamlInventoryProvider
-from app.persistence.models import Attempt, AttemptEvent
+from app.persistence.models import Attempt, AttemptEvent, RegistrationFailure
 
 router = APIRouter()
 
@@ -30,6 +30,20 @@ def dashboard_data(request: Request):
     require_dashboard(request)
     state = request.app.state
     with Session(state.db) as session:
+        failures = [
+            {
+                "serial": f.serial,
+                "stage": f.stage,
+                "code": f.code,
+                "message": f.message,
+                "at": f.created_at,
+            }
+            for f in session.scalars(
+                select(RegistrationFailure)
+                .order_by(RegistrationFailure.created_at.desc(), RegistrationFailure.id.desc())
+                .limit(100)
+            )
+        ]
         attempts = session.scalars(
             select(Attempt).order_by(Attempt.created_at.desc()).limit(500)
         ).all()
@@ -85,6 +99,7 @@ def dashboard_data(request: Request):
         "provider": state.config.inventory_provider,
         "mode": state.config.execution_mode,
         "attempts": rows,
+        "failures": failures,
         "inventory": inventory,
         "inventory_error": inventory_error,
         "limit": 500,

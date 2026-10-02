@@ -98,27 +98,38 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
         state = request.app.state
         source = request.client.host if request.client else "unknown"
         state.repository.rate_limit(source, state.config.registration_limit_per_minute)
-        device = state.inventory.get_device_by_serial(observed.serial_number)
-        authorize_identity(device, observed)
-        intent = state.inventory.get_device_intent(device.id)
-        if intent.device.id != device.id:
-            raise InventoryDenied()
-        authorize_intent(intent, observed)
-        manifest = state.adapter.build_manifest(intent, observed)
-        manifest, config_body = configuration_manifest(manifest, intent, state.config)
-        return state.repository.register(
-            intent,
-            observed,
-            manifest,
-            state.config.status_token_ttl_seconds,
-            config_body,
-            state.config.upgrade_validation_delay_seconds
-            if manifest.upgrade_required
-            else state.config.validation_delay_seconds,
-            state.config.upgrade_deadline_seconds
-            if manifest.upgrade_required
-            else state.config.validation_deadline_seconds,
-        )
+        stage = "inventory_lookup"
+        try:
+            device = state.inventory.get_device_by_serial(observed.serial_number)
+            stage = "identity_validation"
+            authorize_identity(device, observed)
+            stage = "intent_lookup"
+            intent = state.inventory.get_device_intent(device.id)
+            if intent.device.id != device.id:
+                raise InventoryDenied()
+            stage = "intent_validation"
+            authorize_intent(intent, observed)
+            stage = "catalog_matching"
+            manifest = state.adapter.build_manifest(intent, observed)
+            stage = "configuration_rendering"
+            manifest, config_body = configuration_manifest(manifest, intent, state.config)
+            stage = "attempt_reconciliation"
+            return state.repository.register(
+                intent,
+                observed,
+                manifest,
+                state.config.status_token_ttl_seconds,
+                config_body,
+                state.config.upgrade_validation_delay_seconds
+                if manifest.upgrade_required
+                else state.config.validation_delay_seconds,
+                state.config.upgrade_deadline_seconds
+                if manifest.upgrade_required
+                else state.config.validation_deadline_seconds,
+            )
+        except ZtpError as exc:
+            state.repository.record_registration_failure(observed.serial_number, stage, exc)
+            raise
 
     @app.get("/api/v1/ztp/status/{provisioning_id}", response_model=StatusResponse)
     def status(

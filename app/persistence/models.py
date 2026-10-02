@@ -58,3 +58,13 @@ class ValidationJob(Base):
     lease_until: Mapped[int] = mapped_column(BigInteger, default=0)
     done: Mapped[bool] = mapped_column(Boolean, default=False)
     evidence: Mapped[dict | None] = mapped_column(JSON)
+
+
+class RegistrationFailure(Base):
+    __tablename__ = "registration_failures"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    serial: Mapped[str] = mapped_column(String(128))
+    stage: Mapped[str] = mapped_column(String(64))
+    code: Mapped[str] = mapped_column(String(64))
+    message: Mapped[str] = mapped_column(String(256))
+    created_at: Mapped[int] = mapped_column(BigInteger, index=True)

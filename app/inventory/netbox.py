@@ -15,6 +15,12 @@ from app.models.contracts import (
 
 
 def identity(record: dict, platform_slug: str) -> DeviceIdentity:
+    if not record.get("platform"):
+        raise InvalidIntent("platform_missing", "NetBox device has no platform assigned")
+    if record["platform"].get("slug") != platform_slug:
+        raise InvalidIntent(
+            "platform_mismatch", "NetBox platform does not match configured platform slug"
+        )
     try:
         return DeviceIdentity(
             id=str(record["id"]),
@@ -87,7 +93,7 @@ class NetBoxInventoryProvider(InventoryProvider):
         else:
             raise InventoryUnavailable()
         if len(records) != 1:
-            raise InventoryDenied()
+            raise InventoryDenied("serial_not_found", "Chassis serial was not found in inventory")
         device = identity(records[0], self.platform_slug)
         if device.serial_number != serial:
             raise InventoryDenied()
@@ -103,8 +109,17 @@ class NetBoxInventoryProvider(InventoryProvider):
                 raise InvalidIntent()
             context = record["config_context"]
             if context["provisioning"]["ztp_enabled"] is not True:
-                raise InventoryDenied()
+                raise InventoryDenied("ztp_disabled", "ZTP is not enabled for this device")
             ztp = context["ztp"]
+            import re
+
+            if not isinstance(ztp["image"]["sha256"], str) or not re.fullmatch(
+                r"[a-f0-9]{64}", ztp["image"]["sha256"]
+            ):
+                raise InvalidIntent(
+                    "invalid_image_checksum",
+                    "Image SHA-256 must be 64 lowercase hex characters without whitespace",
+                )
             management = ztp["management"]
             primary = record["primary_ip4"]
             ip_id = str(primary["id"])
@@ -139,8 +154,14 @@ class NetBoxInventoryProvider(InventoryProvider):
                     image_checksum=ztp["image"]["sha256"],
                 ),
             )
-        except (KeyError, TypeError, AttributeError, ValidationError) as exc:
-            raise InvalidIntent() from exc
+        except KeyError as exc:
+            raise InvalidIntent(
+                "missing_ztp_field", "Required ZTP context or management field is missing"
+            ) from exc
+        except (TypeError, AttributeError, ValidationError) as exc:
+            raise InvalidIntent(
+                "invalid_ztp_context", "ZTP context or primary management IP is invalid"
+            ) from exc
 
     def check_ready(self) -> None:
         self._get("dcim/devices/", {"limit": 1, "exclude": "config_context"})

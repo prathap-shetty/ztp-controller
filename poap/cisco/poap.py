@@ -27,6 +27,39 @@ CA_PEM = ""
 MAX_ATTEMPTS = 3
 
 
+CONTROLLER_ERRORS = {
+    "platform_missing": "NetBox device has no platform assigned",
+    "platform_mismatch": "Inventory platform does not match configured NX-OS platform",
+    "serial_not_found": "Chassis serial not found in inventory",
+    "serial_mismatch": "Chassis serial does not match inventory",
+    "model_mismatch": "Chassis model does not match inventory",
+    "vendor_mismatch": "Manufacturer does not match inventory",
+    "device_not_staged": "Inventory device must be staged",
+    "ztp_disabled": "ZTP is disabled for this device",
+    "invalid_image_checksum": "Invalid image SHA-256; check length and whitespace",
+    "missing_ztp_field": "Required ZTP context or management field is missing",
+    "invalid_ztp_context": "ZTP context or management IP is invalid",
+    "catalog_mismatch": "No unique matching image catalog profile",
+    "attempt_conflict": "Previous attempt requires reconciliation",
+    "inventory_unavailable": "Inventory service is unavailable",
+}
+
+
+class ControllerRejected(RuntimeError):
+    pass
+
+
+def controller_rejection(exc):
+    # Never echo arbitrary server response text, URLs or credentials to the console.
+    try:
+        code = json.loads(exc.read(4096)).get("error", {}).get("code")
+        if code in CONTROLLER_ERRORS:
+            return ControllerRejected("ZTP controller: " + code + " - " + CONTROLLER_ERRORS[code])
+    except (ValueError, AttributeError, TypeError):
+        pass
+    return ControllerRejected("ZTP controller rejected request: HTTP " + str(exc.code))
+
+
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise RuntimeError("Redirects are not permitted")
@@ -68,7 +101,7 @@ def request(path, data=None, token=None):
                 return content
         except HTTPError as exc:
             if exc.code not in (429, 502, 503, 504) or attempt == MAX_ATTEMPTS - 1:
-                raise RuntimeError("Controller rejected request: " + str(exc.code)) from None
+                raise controller_rejection(exc) from None
         except URLError as exc:
             if isinstance(exc.reason, ssl.SSLError) or attempt == MAX_ATTEMPTS - 1:
                 raise RuntimeError("Controller transport failed") from None
@@ -363,6 +396,9 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
+    except ControllerRejected as exc:
+        sys.stderr.write(str(exc) + "\n")
+        sys.exit(1)
     except Exception:
         # Do not log URLs/tokens or arbitrary CLI/config output.
         sys.stderr.write("ZTP configuration-only bootstrap failed; inspect controller attempt.\n")

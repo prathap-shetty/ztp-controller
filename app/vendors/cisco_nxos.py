@@ -53,7 +53,10 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
             )
         ]
         if len(matches) != 1:
-            raise InventoryDenied()
+            raise InventoryDenied(
+                "catalog_mismatch",
+                "No unique catalog profile matches model, release and image metadata",
+            )
         return Manifest(
             allow_newer_version=self.allow_newer_version,
             source_validation_enabled=not self.skip_source_validation,
