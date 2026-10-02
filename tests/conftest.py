@@ -57,7 +57,8 @@ def db(monkeypatch):
     with engine.begin() as connection:
         connection.execute(
             text(
-                "DROP TABLE IF EXISTS validation_jobs, attempt_events, status_grants, "
+                "DROP TABLE IF EXISTS registration_failures, validation_jobs, "
+                "attempt_events, status_grants, "
                 "registration_buckets, "
                 "attempts, alembic_version CASCADE"
             )

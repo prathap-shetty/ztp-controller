@@ -438,3 +438,27 @@ and database volume. To adopt the new filename without starting a fresh database
 copy your environment to `.env.lite` and use `-p ztp-poc` on every command with
 `compose.lite.yaml`. Do not run the old and new project concurrently. A fresh Lite
 installation defaults to project `ztp-lite`.
+
+## Controller failure diagnostics
+
+The authenticated dashboard includes **Recent registration failures**, showing
+the latest 100 rejected registrations: time, chassis serial, failed step, error
+code and explanation. This includes rejections before a provisioning attempt
+exists, such as a missing NetBox platform or malformed image checksum. The database
+retains the latest 1,000 records; fixes do not erase earlier failures. Serial search
+also filters this table. Malformed request bodies and rate-limit rejections are
+not recorded here, and switch-side install/replay failures still need console logs.
+No raw config context, passwords, tokens or arbitrary exception text is stored.
+The bootstrap prints a fixed explanation for recognized controller error codes.
+
+To install this update, rebuild and run migrations before the new API starts:
+
+```bash
+docker compose --env-file .env.lite -f compose.lite.yaml up -d --build ztp-api nginx
+python3 scripts/release_bootstrap.py --controller http://10.10.10.1 --allow-http --output deploy/bootstrap
+```
+
+Compose's migration service applies database revision `0003`. On the Mac, use
+`.env.poc.mac` and `compose.poc.mac.yaml` instead. Regenerating the bootstrap is
+required for console explanations; no switch erase is needed merely to correct
+NetBox data and retry a previously rejected registration.

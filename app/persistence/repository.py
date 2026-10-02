@@ -13,6 +13,7 @@ from app.persistence.models import (
     Attempt,
     AttemptEvent,
     RegistrationBucket,
+    RegistrationFailure,
     StatusGrant,
     ValidationJob,
 )
@@ -47,6 +48,35 @@ class Repository:
             count = session.execute(statement).scalar_one()
         if count > limit:
             raise ZtpError("rate_limited", 429, "Registration rate exceeded; retry later")
+
+    def record_registration_failure(self, serial, stage, error):
+        import logging
+
+        from sqlalchemy.exc import SQLAlchemyError
+
+        try:
+            with Session(self.engine) as session, session.begin():
+                session.add(
+                    RegistrationFailure(
+                        id=str(uuid.uuid4()),
+                        serial=serial,
+                        stage=stage,
+                        code=error.code,
+                        message=error.message[:256],
+                        created_at=int(time.time()),
+                    )
+                )
+                session.flush()
+                keep = (
+                    select(RegistrationFailure.id)
+                    .order_by(RegistrationFailure.created_at.desc(), RegistrationFailure.id.desc())
+                    .limit(1000)
+                )
+                session.execute(
+                    delete(RegistrationFailure).where(RegistrationFailure.id.not_in(keep))
+                )
+        except SQLAlchemyError:
+            logging.getLogger(__name__).warning("Registration diagnostic could not be persisted")
 
     def register(
         self,

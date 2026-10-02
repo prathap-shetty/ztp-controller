@@ -5,8 +5,8 @@ class ZtpError(Exception):
 
 
 class InventoryDenied(ZtpError):
-    def __init__(self):
-        super().__init__("not_eligible", 403, "Device is not eligible for provisioning")
+    def __init__(self, code="not_eligible", message="Device is not eligible for provisioning"):
+        super().__init__(code, 403, message)
 
 
 class InventoryUnavailable(ZtpError):
@@ -15,5 +15,5 @@ class InventoryUnavailable(ZtpError):
 
 
 class InvalidIntent(ZtpError):
-    def __init__(self):
-        super().__init__("invalid_intent", 403, "Device is not eligible for provisioning")
+    def __init__(self, code="invalid_intent", message="Device is not eligible for provisioning"):
+        super().__init__(code, 403, message)

@@ -137,4 +137,4 @@ def test_migration_round_trip(db):
     command.downgrade(Config("alembic.ini"), "base")
     command.upgrade(Config("alembic.ini"), "head")
     with db.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0002"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0003"
