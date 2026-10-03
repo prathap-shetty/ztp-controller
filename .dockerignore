@@ -9,13 +9,8 @@ secrets
 
 images/
 *.bin
-
-.env.poc
-
-.env.poc.mac
-
 .env.lite
-
+.env.lite.mac
 .env.*
 inventory/
 exports/

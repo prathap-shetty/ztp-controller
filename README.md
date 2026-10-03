@@ -33,7 +33,6 @@ firmware is bundled. Use licensed images and vendor-approved upgrade paths.
   saved startup configuration.
 - No automatic rollback, fleet scheduling, or automatic clearing of failed attempts.
 
-The tested shared Python modules and regression tests remain in this branch,
-including legacy internal names such as `poc_mode`. Alternate Mac PoC and standard
-TLS/SSH deployment files are removed; shared runtime code has not been refactored.
+The tested shared Python modules and regression tests remain in this branch.
+Alternate platform deployment files are excluded; shared runtime behavior is unchanged.
 Future multivendor work is [planned separately](docs/multivendor-implementation-plan.md).

@@ -1,4 +1,4 @@
-"""Explicit per-device PoC reprovisioning after an operator erases a switch."""
+"""Explicit per-device Lite reprovisioning after an operator erases a switch."""
 
 import argparse
 import time
@@ -53,8 +53,8 @@ def main():
     )
     args = parser.parse_args()
     settings = Settings()
-    if not settings.poc_mode or not args.confirm_erased:
-        parser.error("Requires PoC mode and --confirm-erased; stop the previous run first")
+    if not settings.lite_mode or not args.confirm_erased:
+        parser.error("Requires Lite mode and --confirm-erased; stop the previous run first")
     engine = build_engine(settings.database_url.get_secret_value())
     try:
         previous = prepare_reprovision(engine, args.serial)

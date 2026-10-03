@@ -26,12 +26,14 @@ license grant or a security certification. Preserve third-party notices, includi
 
 The branch keeps `compose.lite.yaml` and project name `ztp-lite`, so existing named
 volumes are reused if you keep the same project name. Back up PostgreSQL first.
-Changes to local environment values needed when adopting this branch:
+Use `.env.lite.example` as the settings reference when adopting this branch:
 
-- Rename `POC_ADMIN_PASSWORD` to `ZTP_ADMIN_PASSWORD`, preserving its value.
-- Use `deploy/lite/kea.json` and `deploy/lite/nginx.conf` instead of `deploy/poc/`.
+- Set `ZTP_ADMIN_PASSWORD` to the intended switch admin password.
+- DHCP and HTTP configuration live in `deploy/lite/`.
 - Existing catalog paths can remain unchanged; new setups default to `catalog/lite.json`.
-- Use `scripts/prepare_lite.py` instead of `prepare_poc.py` for new catalogs.
+- Use `scripts/prepare_lite.py` for new catalogs.
+- The Python mode setting is `lite_mode` (`ZTP_LITE_MODE` in the environment).
+  The Compose file enables it automatically. Older mode/password setting names
+  are no longer supported; recreate containers with the updated Compose file.
 
-Do not use `down -v` during an update. Existing runtime policy fields retain legacy
-names internally so this packaging change does not alter established behavior.
+Do not use `down -v` during an update. This naming update does not change provisioning policy.

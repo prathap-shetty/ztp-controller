@@ -33,7 +33,7 @@ def main():
         parser.error("Image checksum mismatch")
     profiles = [
         dict(
-            id="poc-" + str(n),
+            id="lite-" + str(n),
             model=model.upper(),
             source_versions=args.source,
             target_version=args.target,
