@@ -36,3 +36,8 @@ firmware is bundled. Use licensed images and vendor-approved upgrade paths.
 The tested shared Python modules and regression tests remain in this branch.
 Alternate platform deployment files are excluded; shared runtime behavior is unchanged.
 Future multivendor work is [planned separately](docs/multivendor-implementation-plan.md).
+
+## License
+
+ZTP Lite is licensed under the [MIT License](LICENSE).
+Third-party dependencies and vendor firmware retain their respective licenses.
