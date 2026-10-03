@@ -122,7 +122,20 @@ The dashboard deliberately shows “Awaiting manual verification” after stagin
 ## 6. Reprovision after an erase
 
 Once the previous installation is finished and the device has been deliberately
-erased, reset its controller attempt once:
+erased, reset its controller attempt once from the dashboard:
+
+1. Sign in and open the device's attempt details.
+2. Click **Reset for reprovisioning**.
+3. Click **OK** to confirm. The UI uses the device's recorded serial automatically.
+4. Let the erased switch retry POAP. The new attempt reads the current inventory
+   and renders the updated template. With the default version policy, an equal or
+   newer supported software release skips installation and applies configuration.
+
+This resets the controller record only; it does not erase or reload the switch.
+The API can remain running. Archived attempts retain their history and cannot be
+reset again. A stale browser cannot reset a replacement attempt.
+
+Alternatively, use the CLI:
 
 ```bash
 docker compose --env-file .env.lite -f compose.lite.yaml stop ztp-api
