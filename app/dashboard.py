@@ -1,9 +1,11 @@
-"""Authenticated read-only operator dashboard."""
+"""Authenticated operator dashboard."""
 
 from pathlib import Path
+from uuid import UUID
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field, StrictBool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,6 +13,7 @@ from app.dashboard_auth import authenticated, login_page, require_dashboard
 from app.errors import ZtpError
 from app.inventory.local_yaml import LocalYamlInventoryProvider
 from app.persistence.models import Attempt, AttemptEvent, RegistrationFailure
+from app.reprovision import prepare_reprovision
 
 router = APIRouter()
 
@@ -96,6 +99,7 @@ def dashboard_data(request: Request):
         except ZtpError:
             inventory_error = "Local inventory could not be loaded. Check its path and YAML format."
     return {
+        "can_reprovision": state.config.poc_mode,
         "provider": state.config.inventory_provider,
         "mode": state.config.execution_mode,
         "attempts": rows,
@@ -103,4 +107,30 @@ def dashboard_data(request: Request):
         "inventory": inventory,
         "inventory_error": inventory_error,
         "limit": 500,
+    }
+
+
+class ReprovisionRequest(BaseModel):
+    serial: str = Field(min_length=1, max_length=128)
+    confirm_erased: StrictBool
+
+
+@router.post("/api/dashboard/attempts/{attempt_id}/reprovision")
+def reset_attempt(attempt_id: UUID, body: ReprovisionRequest, request: Request):
+    require_dashboard(request)
+    if not request.app.state.config.poc_mode:
+        raise HTTPException(403, "UI reprovisioning requires Lite mode")
+    # Cross-origin forms cannot set this header; cross-origin fetch must pass CORS,
+    # which the dashboard intentionally does not enable.
+    if request.headers.get("X-ZTP-Action") != "reprovision":
+        raise HTTPException(403, "Dashboard action header required")
+    if not body.confirm_erased:
+        raise HTTPException(400, "Confirm the previous run is stopped and the switch is erased")
+    try:
+        archived = prepare_reprovision(request.app.state.db, body.serial, str(attempt_id))
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+    return {
+        "archived_attempt_id": archived,
+        "message": "Reset complete. Next POAP registration will create a fresh attempt.",
     }

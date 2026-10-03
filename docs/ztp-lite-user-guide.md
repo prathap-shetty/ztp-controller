@@ -462,3 +462,16 @@ Compose's migration service applies database revision `0003`. On the Mac, use
 `.env.poc.mac` and `compose.poc.mac.yaml` instead. Regenerating the bootstrap is
 required for console explanations; no switch erase is needed merely to correct
 NetBox data and retry a previously rejected registration.
+
+## Reset a device from the dashboard
+
+After the previous run has stopped and the switch has been deliberately erased,
+open its attempt details and click **Reset for reprovisioning**, then **OK**.
+The UI uses the recorded serial automatically. No CLI command or API downtime is
+needed. This resets the controller attempt only; it does not erase or reboot the
+switch. History is archived and old tokens are revoked. The next POAP registration
+reads current inventory and renders the updated configuration. Equal/newer
+supported software skips installation when the configured version policy allows it.
+Archived attempts cannot be reset again, and stale pages cannot reset a newer attempt.
+
+Rebuild the API container to enable this UI action.

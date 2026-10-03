@@ -12,7 +12,7 @@ from app.persistence.models import Attempt, AttemptEvent, StatusGrant, Validatio
 from app.settings import Settings
 
 
-def prepare_reprovision(engine, serial):
+def prepare_reprovision(engine, serial, expected_attempt_id=None):
     """Archive the previous identity slot; retain its immutable plan and audit events."""
     with Session(engine) as session, session.begin():
         attempt = session.scalar(
@@ -20,6 +20,8 @@ def prepare_reprovision(engine, serial):
         )
         if attempt is None:
             raise ValueError("No current attempt found for that serial")
+        if expected_attempt_id is not None and attempt.id != expected_attempt_id:
+            raise ValueError("Attempt changed; refresh the dashboard before retrying")
         previous_id = attempt.id
         session.execute(delete(StatusGrant).where(StatusGrant.attempt_id == previous_id))
         job = session.get(ValidationJob, previous_id)
