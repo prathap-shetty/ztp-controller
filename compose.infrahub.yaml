@@ -1,0 +1,14 @@
+# Standard-stack override: remove the unrelated NetBox secret requirement.
+services:
+  migrate:
+    secrets: !reset []
+    environment:
+      ZTP_INVENTORY_PROVIDER: infrahub
+  ztp-api:
+    secrets: !reset []
+    environment:
+      ZTP_INVENTORY_PROVIDER: infrahub
+  ztp-worker:
+    secrets: !reset []
+    environment:
+      ZTP_INVENTORY_PROVIDER: infrahub

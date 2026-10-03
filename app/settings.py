@@ -9,6 +9,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ZTP_", extra="ignore")
     database_url: SecretStr
+    infrahub_url: str = ""
+    infrahub_token: SecretStr | None = None
+    infrahub_token_file: Path | None = None
+    infrahub_verify_ssl: bool = True
+    infrahub_allow_http: bool = False
+    infrahub_branch: str = "main"
+    infrahub_platform: str = "cisco_nxos"
     netbox_url: str = ""
     netbox_verify_ssl: bool = True
     netbox_token: SecretStr | None = None
@@ -19,7 +26,7 @@ class Settings(BaseSettings):
     upgrade_validation_delay_seconds: int = 1800
     upgrade_deadline_seconds: int = 7200
     catalog_path: Path = Path("catalog/profiles.json")
-    inventory_provider: Literal["netbox", "local-yaml"] = "netbox"
+    inventory_provider: Literal["netbox", "local-yaml", "infrahub"] = "netbox"
     local_inventory_path: Path = Path("inventory/devices.yaml")
     allow_http_netbox: bool = False
     execution_mode: Literal["planning-only", "configuration-only", "upgrade-and-configure"] = (
@@ -50,6 +57,26 @@ class Settings(BaseSettings):
     def validate_configuration(self):
         if self.dashboard_token and len(self.dashboard_token.get_secret_value()) < 24:
             raise ValueError("Dashboard token must contain at least 24 characters")
+        if self.inventory_provider == "infrahub":
+            import re
+
+            url = urlsplit(self.infrahub_url)
+            if (
+                url.scheme not in {"https", "http"}
+                or not url.hostname
+                or url.username
+                or url.password
+                or url.query
+                or url.fragment
+                or url.path not in {"", "/"}
+            ):
+                raise ValueError("InfraHub URL must be an HTTP(S) origin")
+            if url.scheme == "http" and not self.infrahub_allow_http:
+                raise ValueError("HTTP InfraHub requires infrahub_allow_http")
+            if bool(self.infrahub_token) == bool(self.infrahub_token_file):
+                raise ValueError("Configure exactly one InfraHub token source")
+            if not re.fullmatch(r"[A-Za-z0-9_-]+", self.infrahub_branch):
+                raise ValueError("Invalid InfraHub branch name")
         if self.inventory_provider == "netbox":
             url = urlsplit(self.netbox_url)
             if (
