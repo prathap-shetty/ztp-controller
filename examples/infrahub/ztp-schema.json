@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "extensions": {
+    "nodes": [
+      {
+        "kind": "DcimDevice",
+        "attributes": [
+          {
+            "name": "ztp_enabled",
+            "kind": "Boolean",
+            "default_value": false,
+            "optional": true
+          },
+          {
+            "name": "ztp_gateway",
+            "kind": "Text",
+            "optional": true
+          },
+          {
+            "name": "ztp_target_version",
+            "kind": "Text",
+            "optional": true
+          },
+          {
+            "name": "ztp_image_name",
+            "kind": "Text",
+            "optional": true
+          },
+          {
+            "name": "ztp_image_sha256",
+            "kind": "Text",
+            "optional": true
+          },
+          {
+            "name": "ztp_initial_configuration",
+            "kind": "JSON",
+            "optional": true
+          }
+        ]
+      }
+    ]
+  }
+}

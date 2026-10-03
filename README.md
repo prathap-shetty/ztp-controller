@@ -1,6 +1,6 @@
 # ZTP Lite and Mac PoC
 
-**ZTP Lite** is the simple Linux deployment for a controlled management network: local YAML or NetBox, NX-OS upgrade and configuration, and a token-protected status dashboard. It keeps TLS and SSH host-key validation disabled and uses manual post-boot verification. See the [ZTP Lite user guide](docs/ztp-lite-user-guide.md). Use `compose.lite.yaml` with `.env.lite`.
+**ZTP Lite** is the simple Linux deployment for a controlled management network: local YAML, NetBox or InfraHub, NX-OS upgrade and configuration, and a token-protected status dashboard. It keeps TLS and SSH host-key validation disabled and uses manual post-boot verification. See the [ZTP Lite user guide](docs/ztp-lite-user-guide.md). Use `compose.lite.yaml` with `.env.lite`.
 
 **Mac PoC** uses Docker Desktop and native DHCP on the USB-Ethernet adapter. See the [Mac PoC guide](examples/mac-en7/README.md).
 
@@ -198,3 +198,7 @@ Start with the [step-by-step two-interface VM lab user guide](docs/poc-lab-user-
 For a Mac USB Ethernet adapter, use the [en7 example](examples/mac-en7/README.md):
 `compose.poc.mac.yaml` runs HTTP/API/database in Docker Desktop while native dnsmasq
 serves DHCP on en7. Docker Desktop cannot expose en7 directly to the Kea container.
+
+## InfraHub inventory
+
+Use `ZTP_INVENTORY_PROVIDER=infrahub` with the [InfraHub setup guide](docs/infrahub-inventory.md). The provider reads `DcimDevice` identity and explicit ZTP attributes through GraphQL; it never writes to inventory.

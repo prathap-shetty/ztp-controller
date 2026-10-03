@@ -27,6 +27,12 @@ services:
       ZTP_DATABASE_URL: postgresql+psycopg://ztp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD
         in .env}@postgres:5432/ztp
       ZTP_INVENTORY_PROVIDER: ${ZTP_INVENTORY_PROVIDER:-local-yaml}
+      ZTP_INFRAHUB_URL: ${ZTP_INFRAHUB_URL:-http://host.docker.internal:8000}
+      ZTP_INFRAHUB_TOKEN: ${ZTP_INFRAHUB_TOKEN:-}
+      ZTP_INFRAHUB_BRANCH: ${ZTP_INFRAHUB_BRANCH:-main}
+      ZTP_INFRAHUB_PLATFORM: ${ZTP_INFRAHUB_PLATFORM:-cisco_nxos}
+      ZTP_INFRAHUB_VERIFY_SSL: ${ZTP_INFRAHUB_VERIFY_SSL:-true}
+      ZTP_INFRAHUB_ALLOW_HTTP: ${ZTP_INFRAHUB_ALLOW_HTTP:-false}
       ZTP_LOCAL_INVENTORY_PATH: /run/ztp-inventory/devices.yaml
       ZTP_NETBOX_URL: ${ZTP_NETBOX_URL:-https://netbox.example.invalid}
       ZTP_NETBOX_VERIFY_SSL: 'false'
@@ -77,6 +83,12 @@ services:
       ZTP_DATABASE_URL: postgresql+psycopg://ztp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD
         in .env}@postgres:5432/ztp
       ZTP_INVENTORY_PROVIDER: ${ZTP_INVENTORY_PROVIDER:-local-yaml}
+      ZTP_INFRAHUB_URL: ${ZTP_INFRAHUB_URL:-http://host.docker.internal:8000}
+      ZTP_INFRAHUB_TOKEN: ${ZTP_INFRAHUB_TOKEN:-}
+      ZTP_INFRAHUB_BRANCH: ${ZTP_INFRAHUB_BRANCH:-main}
+      ZTP_INFRAHUB_PLATFORM: ${ZTP_INFRAHUB_PLATFORM:-cisco_nxos}
+      ZTP_INFRAHUB_VERIFY_SSL: ${ZTP_INFRAHUB_VERIFY_SSL:-true}
+      ZTP_INFRAHUB_ALLOW_HTTP: ${ZTP_INFRAHUB_ALLOW_HTTP:-false}
       ZTP_LOCAL_INVENTORY_PATH: /run/ztp-inventory/devices.yaml
       ZTP_NETBOX_URL: ${ZTP_NETBOX_URL:-https://netbox.example.invalid}
       ZTP_NETBOX_VERIFY_SSL: 'false'
