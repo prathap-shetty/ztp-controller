@@ -15,3 +15,7 @@ images/
 .env.poc.mac
 
 .env.lite
+
+.env.*
+inventory/
+exports/

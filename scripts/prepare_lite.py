@@ -1,4 +1,4 @@
-"""Prepare one shared PoC image catalog and HTTP bootstrap (standard library only)."""
+"""Prepare one shared ZTP Lite image catalog and HTTP bootstrap (standard library only)."""
 
 import argparse
 import hashlib
@@ -17,7 +17,7 @@ def main():
     parser.add_argument("--source", action="append", required=True)
     parser.add_argument("--target", default="10.5(4)M")
     parser.add_argument("--controller", default="http://10.10.10.1")
-    parser.add_argument("--catalog", type=Path, default=Path("catalog/poc.json"))
+    parser.add_argument("--catalog", type=Path, default=Path("catalog/lite.json"))
     parser.add_argument("--bootstrap", type=Path, default=Path("deploy/bootstrap"))
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*\.bin", args.image.name):
@@ -52,7 +52,9 @@ def main():
         json.dump(profiles, handle, indent=2)
         handle.write("\n")
     release(Path("poap/cisco/poap.py"), args.bootstrap, args.controller, allow_http=True)
-    print("PoC catalog and HTTP bootstrap prepared for the specified model/source combinations.")
+    print(
+        "ZTP Lite catalog and HTTP bootstrap prepared for the specified model/source combinations."
+    )
 
 
 if __name__ == "__main__":

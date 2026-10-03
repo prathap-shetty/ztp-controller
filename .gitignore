@@ -24,3 +24,7 @@ catalog/poc.json
 /inventory/devices.yaml
 
 .env.lite
+
+catalog/lite.json
+.env.*
+!.env.lite.example

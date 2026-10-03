@@ -17,18 +17,11 @@ ZTP_INFRAHUB_VERIFY_SSL=false
 ZTP_INFRAHUB_ALLOW_HTTP=true
 ```
 
-On Docker Desktop use `host.docker.internal` to reach InfraHub running on the
-Mac; `localhost` inside a container means that container. For a Linux controller
-use the reachable LAN address of the InfraHub host. HTTP and disabled verification
-are explicit lab options; use HTTPS with verification for secured environments.
-These settings are independent of `DUCKCLI_CORE_INFRAHUB_*`: copy the appropriate
-values into the `ZTP_INFRAHUB_*` variables; the controller does not read DuckCLI's
-configuration. Keep the token out of Git. Direct Python deployments may use
-`ZTP_INFRAHUB_TOKEN_FILE` instead of the token environment variable (exactly one).
-
-Lite and Mac Compose support these variables directly. The standard stack uses
-`-f compose.yaml -f compose.infrahub.yaml` to remove the unrelated NetBox secret
-requirement. Standard TLS/SSH requirements are unchanged.
+Use the reachable LAN address of the InfraHub host. `localhost` inside a
+container means that container. HTTP and disabled certificate verification are
+explicit controlled-network options. These variables are independent of
+`DUCKCLI_CORE_INFRAHUB_*`; use the `ZTP_INFRAHUB_*` names above.
+The Lite Compose file supports them directly. Keep API tokens out of Git.
 
 ## One-time schema extension
 
@@ -65,9 +58,9 @@ missing fields or GraphQL errors make inventory unavailable.
 - Image metadata and target version must match a unique local catalog profile.
 - Revocations and changes are re-read on registration and artifact authorization.
 
-For `dc1-pod1-ztp-leaf-1`, use chassis serial `93MK8XNKSEG`, model `N9K-C9300V`,
-primary IP `192.168.20.50/24`, gateway `192.168.20.1`, and target `10.5(4)` (matching
-your chosen catalog). Use the verified checksum of `nxos64-cs.10.5.4.M.bin`.
+Use the actual chassis serial and PID, an assigned management address and a
+gateway on its subnet. The image filename, verified SHA-256 and target release
+must match the local catalog.
 Enable ZTP only when the complete record and catalog are ready. Merely setting
 `automation_enabled` does not authorize ZTP.
 
