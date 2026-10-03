@@ -37,10 +37,10 @@ class Settings(BaseSettings):
     bootstrap_path: Path = Path("poap/cisco/poap.py")
     dashboard_token: SecretStr | None = None
     dashboard_secure_cookie: bool = True
-    poc_mode: bool = False
+    lite_mode: bool = False
     allow_newer_version: bool = False
     skip_source_validation: bool = False
-    poc_admin_password: SecretStr | None = None
+    admin_password: SecretStr | None = None
     ssh_public_key_file: Path | None = None
     ssh_private_key_file: Path | None = None
     ssh_known_hosts_file: Path | None = None
@@ -100,16 +100,16 @@ class Settings(BaseSettings):
             raise ValueError("Token TTL must be between 60 and 86400 seconds")
         if not 1 <= self.registration_limit_per_minute <= 10000:
             raise ValueError("Registration rate must be between 1 and 10000 per minute")
-        if self.skip_source_validation and not self.poc_mode:
-            raise ValueError("Source validation bypass requires PoC mode")
-        if self.poc_mode:
+        if self.skip_source_validation and not self.lite_mode:
+            raise ValueError("Source validation bypass requires Lite mode")
+        if self.lite_mode:
             import re
 
-            if not self.poc_admin_password or not re.fullmatch(
-                r"[A-Za-z0-9!@%_+=.-]{8,128}", self.poc_admin_password.get_secret_value()
+            if not self.admin_password or not re.fullmatch(
+                r"[A-Za-z0-9!@%_+=.-]{8,128}", self.admin_password.get_secret_value()
             ):
-                raise ValueError("PoC requires an 8-128 character single-token admin password")
-        if self.execution_mode != "planning-only" and not self.poc_mode:
+                raise ValueError("Lite requires an 8-128 character single-token admin password")
+        if self.execution_mode != "planning-only" and not self.lite_mode:
             if not self.ssh_public_key_file:
                 raise ValueError("Configuration-only mode requires the SSH public key file")
             if not self.ssh_username.isalnum() or len(self.ssh_username) > 32:

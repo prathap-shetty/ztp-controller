@@ -52,13 +52,13 @@ services:
       ZTP_ALLOW_NEWER_VERSION: ${ZTP_ALLOW_NEWER_VERSION:-true}
       ZTP_DASHBOARD_TOKEN: ${ZTP_DASHBOARD_TOKEN:-}
       ZTP_DASHBOARD_SECURE_COOKIE: 'false'
-      ZTP_POC_MODE: 'true'
+      ZTP_LITE_MODE: 'true'
       ZTP_SKIP_SOURCE_VALIDATION: ${ZTP_SKIP_SOURCE_VALIDATION:-true}
-      ZTP_POC_ADMIN_PASSWORD: ${POC_ADMIN_PASSWORD:?Set POC_ADMIN_PASSWORD}
+      ZTP_ADMIN_PASSWORD: ${ZTP_ADMIN_PASSWORD:?Set ZTP_ADMIN_PASSWORD}
       ZTP_NETBOX_TOKEN: ${ZTP_NETBOX_TOKEN:-}
     volumes:
     - ${ZTP_LOCAL_INVENTORY_DIR:-./inventory}:/run/ztp-inventory:ro
-    - ${ZTP_CATALOG_FILE:-./catalog/profiles.json}:/srv/ztp/catalog/profiles.json:ro
+    - ${ZTP_CATALOG_FILE:-./catalog/lite.json}:/srv/ztp/catalog/profiles.json:ro
     - ${ZTP_IMAGE_DIR:-./images}:/srv/images:ro
     networks: &id002
     - backend
@@ -108,13 +108,13 @@ services:
       ZTP_ALLOW_NEWER_VERSION: ${ZTP_ALLOW_NEWER_VERSION:-true}
       ZTP_DASHBOARD_TOKEN: ${ZTP_DASHBOARD_TOKEN:-}
       ZTP_DASHBOARD_SECURE_COOKIE: 'false'
-      ZTP_POC_MODE: 'true'
+      ZTP_LITE_MODE: 'true'
       ZTP_SKIP_SOURCE_VALIDATION: ${ZTP_SKIP_SOURCE_VALIDATION:-true}
-      ZTP_POC_ADMIN_PASSWORD: ${POC_ADMIN_PASSWORD:?Set POC_ADMIN_PASSWORD}
+      ZTP_ADMIN_PASSWORD: ${ZTP_ADMIN_PASSWORD:?Set ZTP_ADMIN_PASSWORD}
       ZTP_NETBOX_TOKEN: ${ZTP_NETBOX_TOKEN:-}
     volumes:
     - ${ZTP_LOCAL_INVENTORY_DIR:-./inventory}:/run/ztp-inventory:ro
-    - ${ZTP_CATALOG_FILE:-./catalog/profiles.json}:/srv/ztp/catalog/profiles.json:ro
+    - ${ZTP_CATALOG_FILE:-./catalog/lite.json}:/srv/ztp/catalog/profiles.json:ro
     - ${ZTP_IMAGE_DIR:-./images}:/srv/images:ro
     networks: *id002
     security_opt: *id003
@@ -147,7 +147,7 @@ services:
     ports:
     - ${ZTP_BIND_ADDRESS:-10.10.10.1}:${ZTP_HTTP_PORT:-80}:8080
     volumes:
-    - ./deploy/poc/nginx.conf:/etc/nginx/nginx.conf:ro
+    - ./deploy/lite/nginx.conf:/etc/nginx/nginx.conf:ro
     - ${ZTP_BOOTSTRAP_DIR:-./deploy/bootstrap}:/srv/bootstrap:ro
     tmpfs:
     - /tmp
@@ -172,7 +172,7 @@ services:
     - /bin/sh
     - /opt/ztp/start-kea.sh
     volumes:
-    - ${ZTP_KEA_CONFIG:-./deploy/poc/kea.json}:/etc/kea/kea-dhcp4.json:ro
+    - ${ZTP_KEA_CONFIG:-./deploy/lite/kea.json}:/etc/kea/kea-dhcp4.json:ro
     - kea-leases:/var/lib/kea
     - ./deploy/kea/start.sh:/opt/ztp/start-kea.sh:ro
     tmpfs:

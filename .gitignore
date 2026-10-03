@@ -14,13 +14,10 @@ deploy/tls/
 
 images/
 *.bin
-
-.env.poc
-catalog/poc.json
-
-.env.poc.mac
-
+.env.lite
+catalog/lite.json
+.env.lite.mac
 # Local device inventory; use devices.example.yaml as the committed template.
 /inventory/devices.yaml
-
-.env.lite
+.env.*
+!.env.lite.example
