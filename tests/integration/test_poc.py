@@ -12,7 +12,7 @@ from app.settings import Settings
 pytestmark = pytest.mark.postgres
 
 
-def test_lite_no_keys_no_validation_jobs(records, netbox, settings, db, tmp_path):
+def test_poc_no_keys_no_validation_jobs(records, netbox, settings, db, tmp_path):
     profiles = json.loads(settings.catalog_path.read_text())
     profiles[0].update(
         install_method="poap-install-no-reload",
@@ -25,9 +25,9 @@ def test_lite_no_keys_no_validation_jobs(records, netbox, settings, db, tmp_path
         database_url=settings.database_url,
         netbox_url="https://netbox.test",
         netbox_token="test-token",
-        lite_mode=True,
+        poc_mode=True,
         skip_source_validation=True,
-        admin_password="LabPassword123",
+        poc_admin_password="LabPassword123",
         execution_mode="upgrade-and-configure",
         allow_unqualified_lab=True,
         catalog_path=catalog,

@@ -80,8 +80,8 @@ def test_erased_device_gets_new_attempt_without_install(
     settings = settings.model_copy(
         update={
             "execution_mode": "upgrade-and-configure",
-            "lite_mode": True,
-            "admin_password": SecretStr("TestPassword123"),
+            "poc_mode": True,
+            "poc_admin_password": SecretStr("TestPassword123"),
             "allow_newer_version": True,
             "skip_source_validation": True,
             "allow_unqualified_lab": True,

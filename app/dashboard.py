@@ -99,7 +99,7 @@ def dashboard_data(request: Request):
         except ZtpError:
             inventory_error = "Local inventory could not be loaded. Check its path and YAML format."
     return {
-        "can_reprovision": state.config.lite_mode,
+        "can_reprovision": state.config.poc_mode,
         "provider": state.config.inventory_provider,
         "mode": state.config.execution_mode,
         "attempts": rows,
@@ -118,7 +118,7 @@ class ReprovisionRequest(BaseModel):
 @router.post("/api/dashboard/attempts/{attempt_id}/reprovision")
 def reset_attempt(attempt_id: UUID, body: ReprovisionRequest, request: Request):
     require_dashboard(request)
-    if not request.app.state.config.lite_mode:
+    if not request.app.state.config.poc_mode:
         raise HTTPException(403, "UI reprovisioning requires Lite mode")
     # Cross-origin forms cannot set this header; cross-origin fetch must pass CORS,
     # which the dashboard intentionally does not enable.

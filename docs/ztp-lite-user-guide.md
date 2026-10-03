@@ -1,165 +1,477 @@
-# ZTP Lite user guide
+# ZTP Lite v0.1 lab user guide
 
-## 1. Prepare a Linux host
+This guide sets up a dedicated Ubuntu 24.04 amd64 VM with two network interfaces
+for first-boot provisioning of new NX-OS switches. The ZTP Lite uses HTTP and a switch
+admin password; no TLS certificates, SSH keys or known_hosts enrollment are needed.
+Choose local YAML or NetBox for inventory. Final validation is performed manually
+from the console.
 
-Use Docker Engine with Docker Compose v2, Python 3, a management connection and a
-separate NIC (example `ens3`) connected to the provisioning network. Configure
-that NIC with `10.10.10.1/24`, without replacing the host's existing default route.
-Ensure no competing DHCP server serves this segment. Adjust all example addresses
-to your actual network before starting DHCP.
+Start with one switch. DHCP/script delivery has been demonstrated, but physical
+image installation, reboot and replay are not yet qualified. Confirm the exact
+hardware/source/target upgrade path with Cisco before allowing it in the catalog.
 
-```bash
-cp .env.lite.example .env.lite
-chmod 600 .env.lite
-mkdir -p images inventory
-cp inventory/devices.example.yaml inventory/devices.yaml
+## 1. Connect the lab
+
+| Interface | Purpose | Address |
+| --- | --- | --- |
+| ens2 | Existing VM management/internet | Keep existing settings |
+| ens3 | Dedicated ZTP VLAN | 10.10.10.1/24 |
+
+Connect switch mgmt0 ports to the same isolated VLAN as ens3. There must be no
+other DHCP server on that VLAN. Keep switch console access. HTTP sends passwords
+and attempt tokens in cleartext, so keep this ZTP Lite on the dedicated build network.
+Stop any previous stack using the same HTTP ports or DHCP interface.
+
+## 2. Copy the project to the VM
+
+Use a checkout containing `compose.lite.yaml`. If the ZTP Lite commit has been pushed,
+clone or pull the repository on the VM:
+
+```sh
+git clone https://github.com/prathap-shetty/ztp-controller.git
+cd ztp-controller
+# For an existing checkout instead:
+# git pull
 ```
 
-Set unique `POSTGRES_PASSWORD`, `ZTP_ADMIN_PASSWORD` and `ZTP_DASHBOARD_TOKEN` in
-`.env.lite`. Generate the dashboard token with `openssl rand -hex 32`. Blank token
-disables the UI. The switch admin password must be 8–128 characters from
-`A-Za-z0-9!@%_+=.-` and meet the device's own password policy. Use a URL-safe database
-password because it is embedded in the database connection URL.
+If the commit is still only on your Mac, run this on the Mac, replacing the VM
+user/address. This copies source without private runtime files:
 
-## 2. Prepare your image and catalog
+```sh
+cd /Users/prathapshetty/Documents/dev_workspace/ztp-controller
+rsync -av \
+  --exclude='.git' --exclude='.venv' --exclude='__pycache__' \
+  --exclude='.env' --exclude='.env.lite' --exclude='secrets/' \
+  --exclude='images/' --exclude='deploy/tls/' --exclude='deploy/bootstrap/' \
+  ./ YOUR_VM_USER@YOUR_VM_IP:~/ztp-controller/
+```
 
-Copy your licensed NX-OS image to `images/` or set `ZTP_IMAGE_DIR` to a large host
-folder. Verify it against Cisco's published digest. If Cisco provides SHA-512,
-verify that first, then calculate SHA-256 for this controller:
+All remaining commands run on the VM from `~/ztp-controller`, unless noted.
 
-```bash
-sha256sum images/nxos64-cs.10.5.4.M.bin
-python3 scripts/prepare_lite.py \
+## 3. Install Docker
+
+```sh
+sudo apt-get update
+sudo apt-get install -y docker.io docker-compose-v2 python3
+sudo systemctl enable --now docker
+sudo docker compose version
+cd ~/ztp-controller
+```
+
+## 4. Give ens3 its static address
+
+```sh
+ip -br address
+sudo ls /etc/netplan
+```
+
+Preserve the management interface and its default route. If ens3 is not already
+configured elsewhere, create `/etc/netplan/60-ztp.yaml`:
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    ens3:
+      dhcp4: false
+      addresses:
+        - 10.10.10.1/24
+```
+
+```sh
+sudo chmod 600 /etc/netplan/60-ztp.yaml
+sudo netplan try
+ip -br address show ens3
+```
+
+Confirm ens3 shows `10.10.10.1/24`. The VM's default gateway stays on ens2.
+
+## 5. Configure the ZTP Lite environment
+
+```sh
+cp .env.lite.example .env.lite
+chmod 600 .env.lite
+mkdir -p images
+```
+
+Edit `.env.lite`:
+
+```dotenv
+POSTGRES_PASSWORD=ReplaceWithRandomDatabasePassword
+POC_ADMIN_PASSWORD=ReplaceWithStrongLabPassword123
+ZTP_INVENTORY_PROVIDER=local-yaml
+ZTP_LOCAL_INVENTORY_DIR=./inventory
+ZTP_CATALOG_FILE=./catalog/poc.json
+ZTP_IMAGE_DIR=./images
+ZTP_BIND_ADDRESS=10.10.10.1
+ZTP_HTTP_PORT=80
+ZTP_API_PORT=8001
+ZTP_BOOTSTRAP_DIR=./deploy/bootstrap
+ZTP_KEA_CONFIG=./deploy/poc/kea.json
+```
+
+Replace both passwords. `POC_ADMIN_PASSWORD` becomes the switch admin password;
+use 8–128 characters, preferably mixed-case letters and numbers, that satisfy the
+switch's password policy. The accepted punctuation is `!@%_+=.-`; avoid spaces,
+quotes and `$`. For the database, `openssl rand -hex 24` generates a URL-safe value.
+Do not change the database password after initialization without updating the database.
+
+## 6. Download and copy the image
+
+Obtain the licensed image and its published SHA-256 from Cisco. For the FX3 example,
+the target file is `nxos64-cs.10.5.4.M.bin`. From the Mac, for example:
+
+```sh
+scp /path/to/nxos64-cs.10.5.4.M.bin \
+  YOUR_VM_USER@YOUR_VM_IP:~/ztp-controller/images/
+```
+
+The image remains in the host folder and is mounted read-only; it is not baked into
+the Docker image. Ensure container UID 10001 can read the file.
+
+## 7. Generate the catalog and released bootstrap
+
+On the VM, replace the checksum and use the exact source release reported by the
+switch. This example is for the previously discussed FX3 path:
+
+```sh
+python3 scripts/prepare_poc.py \
   --image images/nxos64-cs.10.5.4.M.bin \
-  --sha256 YOUR_VERIFIED_SHA256 \
+  --sha256 PASTE_CISCO_SHA256 \
   --model N9K-C93180YC-FX3 \
   --source '10.4(4)M' \
   --target '10.5(4)M' \
   --controller http://10.10.10.1
 ```
 
-This creates `catalog/lite.json` and the released POAP script under
-`deploy/bootstrap/`. The helper refuses to overwrite an existing catalog. Choose
-the exact chassis PID reported by `show inventory`; repeat `--model` only for
-models qualified for the same image/path. Edit or create separate catalog profiles
-when image families or approved paths differ. The helper marks the path approved
-for this controlled test; it does not establish vendor or hardware qualification.
+This verifies the actual image and creates:
 
-Image filenames are preserved on bootflash. Size and SHA-256 are verified. A file
-with the same name but different contents stops provisioning without overwrite.
-Even configuration-only operation requires matching catalog/image metadata.
-
-## 3. Choose the inventory source
-
-For local YAML, populate `inventory/devices.yaml` from the committed example.
-Use real serials, correct model, final management IP and matching catalog metadata.
-Set `ztp_enabled: true` only after preparing an eligible staged device. Keep final
-IPs outside the DHCP pool.
-
-For NetBox, set `ZTP_INVENTORY_PROVIDER=netbox`, `ZTP_NETBOX_URL`,
-`ZTP_NETBOX_TOKEN` and `ZTP_NETBOX_PLATFORM_SLUG`. The device needs a matching
-chassis serial/model, Cisco manufacturer slug `cisco`, staged status and a primary
-IPv4 address assigned to its own `mgmt0`. Add local config context:
-
-```json
-{
-  "provisioning": {"ztp_enabled": true},
-  "ztp": {
-    "target_nxos": "10.5(4)M",
-    "image": {"filename": "nxos64-cs.10.5.4.M.bin", "sha256": "YOUR_VERIFIED_SHA256"},
-    "management": {"gateway": "10.10.10.1", "vrf": "management", "interface": "mgmt0"}
-  }
-}
+```text
+catalog/poc.json
+deploy/bootstrap/poap.py
+deploy/bootstrap/poap.py.sha256
 ```
 
-For InfraHub, follow the [schema and mapping guide](infrahub-inventory.md).
-No automatic fallback occurs when the selected inventory source is unavailable.
+The helper refuses to overwrite an existing catalog. It approves the explicitly
+specified model/source combinations for the ZTP Lite; only list paths you have checked.
+Do not reformat/edit the released script: regenerate it to keep its MD5 correct.
 
-## 4. Start and check
+For a mixed fleet, keep one catalog JSON array with multiple profiles and one YAML
+file with all devices. Repeat `--model` and `--source` only when **every combination**
+is valid for that image. Different combinations/images need separate entries in
+the same catalog with unique profile IDs. See [ZTP Lite reference](poc-v0.1.md#2-one-catalog-and-one-bootstrap-for-the-fleet).
+DHCP points all devices to the same script; the API selects the matching profile.
 
-Review `deploy/lite/kea.json`: interface `ens3`, subnet `10.10.10.0/24`, pool
-`10.10.10.10–149`, router/script host `10.10.10.1`, DNS `8.8.8.8`. Replace the DNS
-example with a reachable resolver where appropriate. Both DHCP router and DNS
-options are included because NX-OS POAP requires them.
+## 8. Add your first switch
 
-```bash
-docker compose --env-file .env.lite -f compose.lite.yaml --profile dhcp up -d --build
+```sh
+cp inventory/devices.example.yaml inventory/devices.yaml
+```
+
+Replace the file contents with your device details:
+
+```yaml
+schema_version: 1
+devices:
+  - device:
+      id: "leaf-01"
+      name: leaf-01
+      serial_number: REPLACE_WITH_ACTUAL_CHASSIS_SERIAL
+      vendor: cisco
+      platform: nxos
+      model: N9K-C93180YC-FX3
+      status: staged
+    ztp_enabled: true
+    management:
+      address: 10.10.10.150/24
+      gateway: 10.10.10.1
+      vrf: management
+      interface: mgmt0
+    software:
+      target_version: "10.5(4)M"
+      image_name: nxos64-cs.10.5.4.M.bin
+      image_checksum: "PASTE_THE_SAME_CISCO_SHA256"
+```
+
+Use the actual serial and exact PID, not a shortened model family. The software
+fields must match the catalog. Add entries for other devices with unique IDs,
+serials, hostnames and final IPs. The initial_configuration section is optional for
+this ZTP Lite. Do not commit real site inventory/passwords inadvertently.
+
+### NetBox alternative
+
+Instead of local inventory, set these in `.env.lite`:
+
+```dotenv
+ZTP_INVENTORY_PROVIDER=netbox
+ZTP_NETBOX_URL=https://YOUR_NETBOX
+ZTP_NETBOX_TOKEN=YOUR_TOKEN
+ZTP_NETBOX_PLATFORM_SLUG=cisco_nxos
+```
+
+The device must be staged with its actual serial/PID, primary IPv4 assigned to its
+own mgmt0, and the provisioning/ztp config context. See the
+[NetBox context setup](m2a-lab-guide.md#1-inventory-and-profile). The ZTP Lite ignores
+NetBox certificate verification; no token file is needed. This changes inventory
+source only; keep using `compose.lite.yaml` by itself.
+
+## 9. Check DHCP configuration
+
+`deploy/poc/kea.json` already specifies:
+
+| Setting | Value |
+| --- | --- |
+| Interface/subnet | ens3 / 10.10.10.0/24 |
+| Temporary lease pool | 10.10.10.10–10.10.10.149 |
+| Router / DNS | 10.10.10.1 / 8.8.8.8 |
+| Script server / filename | http://10.10.10.1 / bootstrap/poap.py |
+
+Final static addresses must be outside the pool; `.150–.254` are available in this
+example if not already used. Router/DNS options were required by the observed POAP
+client. The stack does not configure upstream routing or DNS service; local image/
+script/API downloads use literal addresses and do not depend on external DNS.
+
+## 10. Build and test HTTP before enabling DHCP
+
+```sh
+sudo docker compose --env-file .env.lite -f compose.lite.yaml up --build -d
 curl http://10.10.10.1/ready
-docker compose --env-file .env.lite -f compose.lite.yaml logs -f ztp-api nginx kea-dhcp4
+curl -f http://10.10.10.1/bootstrap/poap.py -o /tmp/poap-test.py
+cmp /tmp/poap-test.py deploy/bootstrap/poap.py
 ```
 
-Readiness confirms database/inventory access, not per-device eligibility. Database
-migrations run before the API. Commands may require `sudo` on your host.
+Readiness should return `{"status":"ready"}`; no output from `cmp` means the
+bootstrap bytes match. Use `docker compose --env-file .env.lite -f compose.lite.yaml ps`
+to inspect containers. Readiness does not prove hardware compatibility.
 
-Open `http://10.10.10.1/` and enter `ZTP_DASHBOARD_TOKEN`. Alternatively, tunnel the
-loopback API port from your workstation:
+## 11. Validate and enable DHCP
+
+```sh
+sudo docker compose --env-file .env.lite -f compose.lite.yaml --profile dhcp \
+  run --rm --no-deps --entrypoint /usr/sbin/kea-dhcp4 \
+  kea-dhcp4 -t /etc/kea/kea-dhcp4.json
+
+sudo docker compose --env-file .env.lite -f compose.lite.yaml --profile dhcp up -d
+```
+
+If a host firewall is enabled, allow DHCP UDP 67/68 and HTTP TCP 80 on the dedicated
+ZTP network. This configuration uses HTTP; the ZTP Lite does not start TFTP or HTTPS.
+
+## 12. Boot and observe the new switch
+
+Connect console and mgmt0, then power on the unconfigured switch. At the abort-POAP
+prompt, enter `no` to continue POAP. Do not erase a configured switch as part of
+this new-device procedure.
+
+```sh
+sudo docker compose --env-file .env.lite -f compose.lite.yaml \
+  logs -f kea-dhcp4 nginx ztp-api
+```
+
+Expected sequence: DHCP → script download/MD5 → inventory match → image download/
+SHA-256 → installation → native POAP reboot → configuration replay. If already at
+the target version, the script skips image installation.
+
+## 13. Confirm the result manually
+
+From the console after reboot:
+
+```text
+show version
+show interface mgmt0
+show running-config
+show startup-config
+```
+
+Confirm target software, hostname, final management IP and saved configuration.
+The controller's `CONFIGURING` state and `validation_policy: manual` mean replay
+was scheduled, not that post-reboot success was independently verified. There is
+no SSH validation worker, no NetBox activation and no automatic final success claim.
+
+If a stage fails, retain console output, API logs and bootflash checkpoint files.
+Do not delete checkpoints/database history to force a retry without reconciling
+actual device state. Test one device per exact model/source combination before
+larger batches; the ZTP Lite does not coordinate concurrent upgrades for an 80-device fleet.
+
+## Stop the lab
+
+Stop DHCP first when finished:
+
+```sh
+sudo docker compose --env-file .env.lite -f compose.lite.yaml --profile dhcp stop kea-dhcp4
+sudo docker compose --env-file .env.lite -f compose.lite.yaml --profile dhcp down
+```
+
+Do not add `--volumes` unless intentionally discarding lab database and lease history.
+
+## Verification record
+
+The implementation passed 97 automated tests. A local Docker smoke test started
+PostgreSQL, migrations, API and HTTP nginx without certificates/SSH keys; readiness
+and bootstrap byte comparison passed. That smoke test did not enable DHCP or run
+an actual switch upgrade. Full physical install/replay qualification remains pending.
+
+
+## ZTP Lite source-release bypass
+
+The ZTP Lite Compose file now defaults `ZTP_SKIP_SOURCE_VALIDATION=true`. Any running
+source version may match a profile for the exact model, target and image. Catalog
+`source_versions` entries are retained as reference metadata but are not enforced
+in this mode. The released bootstrap honors the same manifest policy. Set the
+variable to `false` in `.env.lite` to restore source matching. The standard controller
+still validates sources and rejects this bypass unless ZTP Lite mode is enabled.
+
+Keep one unambiguous profile per model/target/image when bypassing source matching:
+multiple entries differing only in their source lists will match simultaneously
+and be denied. NX-OS may still reject the installation; this does not implement
+intermediate upgrades or prove every source release is compatible.
+
+After updating, rebuild the ZTP Lite containers and regenerate the served script:
+
+```sh
+python3 scripts/release_bootstrap.py --controller http://10.10.10.1 \
+  --allow-http --output deploy/bootstrap
+sudo docker compose --env-file .env.lite -f compose.lite.yaml --profile dhcp up --build -d
+```
+
+Do not rerun the catalog helper just to release the script: it refuses to overwrite
+an existing catalog. Existing attempts may require reconciliation after policy/plan
+changes; perform this update before beginning a new attempt.
+
+## Reprovision after write erase
+
+The ZTP Lite Compose builds now default to `ZTP_ALLOW_NEWER_VERSION=true`. An equal or
+newer installed release gets configuration only; an older release follows the
+approved upgrade path. `10.5(4)` and `10.5(4)M` are equivalent. Ordering supports
+numeric `major.minor(patch)` releases with an optional `M`; unrecognized suffixes
+are rejected rather than guessed. Set the option to `false` for exact-target
+behavior. This is release ordering, not a Cisco compatibility qualification.
+
+A switch erase does not erase the controller database or necessarily remove
+bootflash checkpoints. Explicitly prepare each erased switch for a fresh attempt.
+Do this only after the previous installation has finished and the device has been
+erased; never reset an attempt while its installation is running.
+
+For the Mac lab (replace `REAL-SERIAL` with the chassis serial in your inventory):
 
 ```bash
-ssh -L 8080:127.0.0.1:8001 USER@CONTROLLER_HOST
+# Update the code first, then build and release the new bootstrap.
+docker compose --env-file .env.poc.mac -f compose.poc.mac.yaml build
+python3 scripts/release_bootstrap.py --controller http://10.10.10.1 --allow-http --output deploy/bootstrap
+
+# Stop registration while archiving the previous attempt. Keep PostgreSQL running.
+docker compose --env-file .env.poc.mac -f compose.poc.mac.yaml stop ztp-api
+docker compose --env-file .env.poc.mac -f compose.poc.mac.yaml run --rm --no-deps ztp-api python -m app.reprovision --serial REAL-SERIAL --confirm-erased
+docker compose --env-file .env.poc.mac -f compose.poc.mac.yaml up -d ztp-api nginx
 ```
 
-Then open `http://localhost:8080/`. Cookie sessions expire after eight hours;
-rotating the environment token and recreating the API invalidates them. Login is
-rate-limited. Neither token login nor the isolated-network assumption encrypts HTTP.
+For Linux use `--env-file .env.lite -f compose.lite.yaml` instead. Keep the same
+Compose project and database volume. Run the reset once for each deliberate
+erase/reprovision cycle; normal POAP retries must reuse their current attempt.
 
-## 5. Provision and verify
+The command archives the previous attempt under its UUID, preserves its original
+identity in the recorded intent/observations, records `OPERATOR_REPROVISION`, and
+revokes its tokens. The archived row has state `FAILED` with reason
+`operator_reprovision` (an operator reset, not an installation failure). The next
+registration creates a fresh attempt ID, so previous bootflash checkpoints are
+ignored without deleting any images or files. Inventory authorization still
+applies. No matching attempt produces an error without changing the database.
 
-Connect a new or deliberately erased switch's mgmt0 to the ZTP network. Allow
-POAP to continue (`no` at the abort prompt). Expected flow: DHCP, script download,
-registration, optional image download/install, configuration staging and native
-POAP reboot/replay. Never erase a working switch without planning the disruption.
+For target `10.5(4)M`: running `10.4(2)` upgrades; running `10.5(4)` or `10.5(5)`
+only stages configuration. An already-installed image is not renamed.
 
-The default `ZTP_ALLOW_NEWER_VERSION=true` skips installation for an equal/newer
-supported numeric release. `10.5(4)` equals `10.5(4)M`. Unknown suffixes are not
-ordered. `ZTP_SKIP_SOURCE_VALIDATION=true` bypasses catalog source-release matching;
-NX-OS may still reject an unsupported install. Neither option qualifies an upgrade
-path. Set the options to false when exact catalog policy is required.
+## Web dashboard
 
-After boot, inspect `show version`, `show hostname`, `show interface mgmt0`,
-`show ip route vrf management` and `show startup-config`. Test gateway connectivity.
-The dashboard deliberately shows “Awaiting manual verification” after staging.
-
-## 6. Reprovision after an erase
-
-Once the previous installation is finished and the device has been deliberately
-erased, reset its controller attempt once from the dashboard:
-
-1. Sign in and open the device's attempt details.
-2. Click **Reset for reprovisioning**.
-3. Click **OK** to confirm. The UI uses the device's recorded serial automatically.
-4. Let the erased switch retry POAP. The new attempt reads the current inventory
-   and renders the updated template. With the default version policy, an equal or
-   newer supported software release skips installation and applies configuration.
-
-This resets the controller record only; it does not erase or reload the switch.
-The API can remain running. Archived attempts retain their history and cannot be
-reset again. A stale browser cannot reset a replacement attempt.
-
-Alternatively, use the CLI:
+The ZTP Lite stack includes a read-only dashboard at `http://10.10.10.1/` (or
+`http://localhost:8001/` when using the example environment’s `ZTP_API_PORT=8001`;
+otherwise use your configured API port).
+Rebuild after updating, then recreate the API and nginx containers:
 
 ```bash
-docker compose --env-file .env.lite -f compose.lite.yaml stop ztp-api
-docker compose --env-file .env.lite -f compose.lite.yaml run --rm --no-deps ztp-api \
-  python -m app.reprovision --serial REAL_SERIAL --confirm-erased
-docker compose --env-file .env.lite -f compose.lite.yaml up -d ztp-api nginx
+docker compose --env-file .env.poc.mac -f compose.poc.mac.yaml up -d --build ztp-api nginx
 ```
 
-This archives history and revokes old tokens. The new attempt ignores old switch
-checkpoints through its new ID. Do not reset during installation or normal retries.
+On Linux substitute `--env-file .env.lite -f compose.lite.yaml`.
+The page refreshes every ten seconds and shows current attempts, archived runs,
+source/target releases, management addresses and event timelines. Search by name,
+serial, model or IP. Local YAML entries appear before registration; NetBox mode
+shows registered devices only, with inventory editing remaining in NetBox.
 
-## Updates and diagnostics
+“Awaiting manual verification” means the switch reported configuration staging,
+not that the controller verified its running version or startup configuration.
+Image transfer percentages and rejected registration requests are not recorded
+in this view; use container logs for those. The view is limited to the latest 500
+attempts. It displays no configuration bodies, passwords or bearer tokens.
 
-Back up the database and environment first. Rebuild the API and regenerate the
-served bootstrap after script updates:
+The dashboard requires the static `ZTP_DASHBOARD_TOKEN` configured in the environment.
+A blank token disables the dashboard. ZTP Lite uses HTTP; keep it on a controlled
+management network. TLS and SSH host-key validation remain disabled; post-boot
+validation is manual. Inventory edits and reprovisioning remain file/CLI operations.
+
+## Dashboard token login
+
+Generate a static token with `openssl rand -hex 32` and put it in `.env.lite`:
+
+```dotenv
+ZTP_DASHBOARD_TOKEN=<paste-generated-token>
+```
+
+Use at least 24 characters. Recreate the API after changing it:
+
+```bash
+docker compose --env-file .env.lite -f compose.lite.yaml up -d --build ztp-api nginx
+```
+
+Open `http://10.10.10.1/` and enter the token. The token is exchanged for an
+HttpOnly, SameSite=Strict cookie lasting eight hours. Sign out clears the cookie;
+rotating the environment token and recreating the API invalidates all sessions.
+Blank disables the dashboard. Device registration and bootstrap requests do not
+use this operator token. Login attempts are limited to ten per minute per
+observed client address (clients behind nginx share that limit).
+
+Mac PoC uses the same token setting in `.env.poc.mac` and its existing Compose file.
+HTTP does not encrypt the token or session traffic. This remains a controlled-network
+deployment, not the certificate-validated standard stack.
+
+Existing deployments: keeping `compose.poc.yaml` preserves the `ztp-poc` project
+and database volume. To adopt the new filename without starting a fresh database,
+copy your environment to `.env.lite` and use `-p ztp-poc` on every command with
+`compose.lite.yaml`. Do not run the old and new project concurrently. A fresh Lite
+installation defaults to project `ztp-lite`.
+
+## Controller failure diagnostics
+
+The authenticated dashboard includes **Recent registration failures**, showing
+the latest 100 rejected registrations: time, chassis serial, failed step, error
+code and explanation. This includes rejections before a provisioning attempt
+exists, such as a missing NetBox platform or malformed image checksum. The database
+retains the latest 1,000 records; fixes do not erase earlier failures. Serial search
+also filters this table. Malformed request bodies and rate-limit rejections are
+not recorded here, and switch-side install/replay failures still need console logs.
+No raw config context, passwords, tokens or arbitrary exception text is stored.
+The bootstrap prints a fixed explanation for recognized controller error codes.
+
+To install this update, rebuild and run migrations before the new API starts:
 
 ```bash
 docker compose --env-file .env.lite -f compose.lite.yaml up -d --build ztp-api nginx
 python3 scripts/release_bootstrap.py --controller http://10.10.10.1 --allow-http --output deploy/bootstrap
 ```
 
-Recent failures shows the latest 100 rejected registrations, with storage capped
-at 1,000 records. It includes missing platforms, malformed checksums, inventory
-mismatches and reconciliation errors. Old failures are not reconstructed.
-Malformed request bodies and rate-limit rejections are not recorded there.
-Switch-side failures still require console logs. No credentials or raw config
-contexts are displayed.
+Compose's migration service applies database revision `0003`. On the Mac, use
+`.env.poc.mac` and `compose.poc.mac.yaml` instead. Regenerating the bootstrap is
+required for console explanations; no switch erase is needed merely to correct
+NetBox data and retry a previously rejected registration.
+
+## Reset a device from the dashboard
+
+After the previous run has stopped and the switch has been deliberately erased,
+open its attempt details and click **Reset for reprovisioning**, then **OK**.
+The UI uses the recorded serial automatically. No CLI command or API downtime is
+needed. This resets the controller attempt only; it does not erase or reboot the
+switch. History is archived and old tokens are revoked. The next POAP registration
+reads current inventory and renders the updated configuration. Equal/newer
+supported software skips installation when the configured version policy allows it.
+Archived attempts cannot be reset again, and stale pages cannot reset a newer attempt.
+
+Rebuild the API container to enable this UI action.

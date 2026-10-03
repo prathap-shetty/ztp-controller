@@ -14,14 +14,14 @@ from app.settings import Settings
 def render_configuration(intent: DeviceIntent, settings: Settings) -> tuple[str, str]:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,62}", intent.device.name):
         raise InvalidIntent()
-    if settings.lite_mode:
-        template = Path("templates/cisco/nxos_lite.j2").read_text()
+    if settings.poc_mode:
+        template = Path("templates/cisco/nxos_poc.j2").read_text()
         rendered = (
             Environment(undefined=StrictUndefined, autoescape=False)
             .from_string(template)
             .render(
                 hostname=intent.device.name,
-                password=settings.admin_password.get_secret_value(),
+                password=settings.poc_admin_password.get_secret_value(),
                 management=intent.management.model_dump(mode="json"),
             )
         )
@@ -88,7 +88,7 @@ def configuration_manifest(
     payload = manifest.model_dump(mode="json")
     payload.update(
         mode=settings.execution_mode,
-        validation_policy="manual" if settings.lite_mode else "ssh",
+        validation_policy="manual" if settings.poc_mode else "ssh",
         execution_enabled=True,
         actions=(
             ["download-image", "install-image", "stage-config"]

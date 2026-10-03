@@ -15,7 +15,7 @@ pytestmark = pytest.mark.postgres
 def test_dashboard_reset_auth_confirmation_and_stale_attempt(settings, netbox, db, records):
     settings = settings.model_copy(
         update={
-            "lite_mode": True,
+            "poc_mode": True,
             "dashboard_token": SecretStr("dashboard-token-for-reset-test"),
             "dashboard_secure_cookie": False,
         }

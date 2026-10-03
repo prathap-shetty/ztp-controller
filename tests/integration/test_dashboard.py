@@ -7,7 +7,7 @@ from app.main import create_app
 pytestmark = pytest.mark.postgres
 
 
-def test_dashboard_disabled_outside_lite(settings, netbox, db):
+def test_dashboard_disabled_outside_poc(settings, netbox, db):
     with TestClient(create_app(settings, netbox[0], db)) as client:
         assert client.get("/").status_code == 404
         assert client.get("/api/dashboard").status_code == 404
@@ -16,7 +16,7 @@ def test_dashboard_disabled_outside_lite(settings, netbox, db):
 def test_dashboard_redacts_attempt_secrets(settings, netbox, db, records):
     settings = settings.model_copy(
         update={
-            "lite_mode": True,
+            "poc_mode": True,
             "dashboard_token": SecretStr("test-dashboard-token-123456"),
             "dashboard_secure_cookie": False,
         }
@@ -55,7 +55,7 @@ def test_dashboard_local_entries_and_invalid_inventory(settings, db, tmp_path):
     inventory.write_text(Path("inventory/devices.example.yaml").read_text())
     settings = settings.model_copy(
         update={
-            "lite_mode": True,
+            "poc_mode": True,
             "inventory_provider": "local-yaml",
             "dashboard_token": SecretStr("test-dashboard-token-123456"),
             "dashboard_secure_cookie": False,
