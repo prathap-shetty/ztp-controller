@@ -95,9 +95,9 @@ def test_unsafe_or_ambiguous_yaml(tmp_path, text):
         LocalYamlInventoryProvider(path).check_ready()
 
 
-def test_shipped_inventory_examples():
-    for name in ["devices.yaml", "devices.example.yaml"]:
-        LocalYamlInventoryProvider(Path("inventory") / name).check_ready()
+def test_shipped_inventory_example():
+    # devices.yaml is operator-owned and intentionally absent from clean checkouts.
+    LocalYamlInventoryProvider(Path("inventory/devices.example.yaml")).check_ready()
 
 
 def test_netbox_still_requires_credentials():
