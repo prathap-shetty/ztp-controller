@@ -124,8 +124,8 @@ The dashboard deliberately shows “Awaiting manual verification” after stagin
 Once the previous installation is finished and the device has been deliberately
 erased, reset its controller attempt once from the dashboard:
 
-1. Sign in and open the device's attempt details.
-2. Click **Reset for reprovisioning**.
+1. Sign in and find the device in the provisioning attempts table.
+2. Click **Reset for reprovisioning** beside **View** in its row.
 3. Click **OK** to confirm. The UI uses the device's recorded serial automatically.
 4. Let the erased switch retry POAP. The new attempt reads the current inventory
    and renders the updated template. With the default version policy, an equal or
@@ -163,3 +163,21 @@ mismatches and reconciliation errors. Old failures are not reconstructed.
 Malformed request bodies and rate-limit rejections are not recorded there.
 Switch-side failures still require console logs. No credentials or raw config
 contexts are displayed.
+
+## Inventory branches
+
+Both providers use `main` when the branch setting is omitted or blank:
+
+```dotenv
+ZTP_NETBOX_BRANCH=main
+ZTP_INFRAHUB_BRANCH=main
+```
+
+For NetBox, set `ZTP_NETBOX_BRANCH` to the branch's eight-character **schema ID**
+from its detail page, for example `td5smq0f`, not its display name or numeric ID.
+Non-main branches require the NetBox Branching plugin. Main omits the branch header
+and works without the plugin. All inventory requests use the selected branch.
+See the [NetBox branching API](https://netboxlabs.com/docs/branching/rest-api/).
+For InfraHub, use the branch name, for example `dc-build`.
+Recreate the API container after changing these environment variables. Existing
+attempts retain their saved intent; use reprovisioning for a fresh inventory read.

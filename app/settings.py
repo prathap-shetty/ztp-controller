@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import SecretStr, model_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     infrahub_branch: str = "main"
     infrahub_platform: str = "cisco_nxos"
     netbox_url: str = ""
+    netbox_branch: str = "main"
     netbox_verify_ssl: bool = True
     netbox_token: SecretStr | None = None
     netbox_token_file: Path | None = None
@@ -52,6 +53,20 @@ class Settings(BaseSettings):
     validation_lease_seconds: int = 180
     status_token_ttl_seconds: int = 3600
     registration_limit_per_minute: int = 60
+
+    @field_validator("netbox_branch", "infrahub_branch", mode="before")
+    @classmethod
+    def default_branch(cls, value):
+        return value.strip() or "main" if isinstance(value, str) else value
+
+    @field_validator("netbox_branch")
+    @classmethod
+    def validate_netbox_branch(cls, value):
+        import re
+
+        if value != "main" and not re.fullmatch(r"[A-Za-z0-9]{8}", value):
+            raise ValueError("NetBox branch must be main or an eight-character schema ID")
+        return value
 
     @model_validator(mode="after")
     def validate_configuration(self):

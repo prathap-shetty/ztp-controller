@@ -29,4 +29,5 @@ def build_provider(settings: Settings) -> InventoryProvider:
         settings.netbox_platform_slug,
         settings.netbox_auth_scheme,
         verify_ssl=settings.netbox_verify_ssl,
+        branch=settings.netbox_branch,
     )

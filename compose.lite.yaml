@@ -35,6 +35,7 @@ services:
       ZTP_INFRAHUB_ALLOW_HTTP: ${ZTP_INFRAHUB_ALLOW_HTTP:-false}
       ZTP_LOCAL_INVENTORY_PATH: /run/ztp-inventory/devices.yaml
       ZTP_NETBOX_URL: ${ZTP_NETBOX_URL:-https://netbox.example.invalid}
+      ZTP_NETBOX_BRANCH: ${ZTP_NETBOX_BRANCH:-main}
       ZTP_NETBOX_VERIFY_SSL: 'false'
       ZTP_NETBOX_AUTH_SCHEME: ${ZTP_NETBOX_AUTH_SCHEME:-Token}
       ZTP_NETBOX_PLATFORM_SLUG: ${ZTP_NETBOX_PLATFORM_SLUG:-nxos}
@@ -91,6 +92,7 @@ services:
       ZTP_INFRAHUB_ALLOW_HTTP: ${ZTP_INFRAHUB_ALLOW_HTTP:-false}
       ZTP_LOCAL_INVENTORY_PATH: /run/ztp-inventory/devices.yaml
       ZTP_NETBOX_URL: ${ZTP_NETBOX_URL:-https://netbox.example.invalid}
+      ZTP_NETBOX_BRANCH: ${ZTP_NETBOX_BRANCH:-main}
       ZTP_NETBOX_VERIFY_SSL: 'false'
       ZTP_NETBOX_AUTH_SCHEME: ${ZTP_NETBOX_AUTH_SCHEME:-Token}
       ZTP_NETBOX_PLATFORM_SLUG: ${ZTP_NETBOX_PLATFORM_SLUG:-nxos}

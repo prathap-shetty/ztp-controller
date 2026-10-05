@@ -44,11 +44,15 @@ class NetBoxInventoryProvider(InventoryProvider):
         auth_scheme: str = "Token",
         transport=None,
         verify_ssl: bool = True,
+        branch: str = "main",
     ):
         self.base_url = base_url.rstrip("/") + "/api/"
         self.platform_slug = platform_slug
+        headers = {"Authorization": f"{auth_scheme} {token}", "Accept": "application/json"}
+        if branch.strip() and branch.strip() != "main":
+            headers["X-NetBox-Branch"] = branch.strip()
         self.client = httpx.Client(
-            headers={"Authorization": f"{auth_scheme} {token}", "Accept": "application/json"},
+            headers=headers,
             timeout=httpx.Timeout(10.0),
             follow_redirects=False,
             transport=transport,
