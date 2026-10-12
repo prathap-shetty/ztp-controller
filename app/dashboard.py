@@ -72,7 +72,10 @@ def dashboard_data(request: Request):
                     "model": a.observed["model"],
                     "address": a.intent["management"]["address"],
                     "source": a.observed["current_version"],
-                    "target": a.manifest["target"]["target_version"],
+                    "platform": a.observed["platform"],
+                    "target": (a.manifest.get("target") or {}).get(
+                        "target_version", "Configuration only"
+                    ),
                     "state": a.state,
                     "archived": a.failure_reason == "operator_reprovision",
                     "reason": a.failure_reason,
@@ -92,7 +95,9 @@ def dashboard_data(request: Request):
                         "serial": entry.device.serial_number,
                         "model": entry.device.model,
                         "address": entry.management.address,
-                        "target": entry.software.target_version,
+                        "target": entry.software.target_version
+                        if entry.software
+                        else "Configuration only",
                         "enabled": entry.ztp_enabled,
                     }
                 )

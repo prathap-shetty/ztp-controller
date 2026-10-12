@@ -29,9 +29,17 @@ def value(node, name):
 
 class InfraHubInventoryProvider(InventoryProvider):
     def __init__(
-        self, url, token, branch="main", platform="cisco_nxos", verify_ssl=True, transport=None
+        self,
+        url,
+        token,
+        branch="main",
+        platform="cisco_nxos",
+        verify_ssl=True,
+        transport=None,
+        xr_platform="cisco_iosxr",
     ):
         self.platform = platform
+        self.xr_platform = xr_platform
         self.endpoint = url.rstrip("/") + "/graphql/" + branch
         self.client = httpx.Client(
             headers={"X-INFRAHUB-KEY": token},
@@ -87,7 +95,7 @@ class InfraHubInventoryProvider(InventoryProvider):
             platform = node["platform"]["node"]
             if not platform:
                 raise InvalidIntent("platform_missing", "InfraHub device has no platform assigned")
-            if value(platform, "name") != self.platform:
+            if value(platform, "name") not in {self.platform, self.xr_platform}:
                 raise InvalidIntent(
                     "platform_mismatch", "InfraHub platform does not match configured platform"
                 )
@@ -99,7 +107,7 @@ class InfraHubInventoryProvider(InventoryProvider):
                 status=value(node, "status"),
                 model=(value(device_type, "part_number") or value(device_type, "name")).upper(),
                 vendor=value(device_type["manufacturer"]["node"], "name").lower(),
-                platform="nxos",
+                platform="nxos" if value(platform, "name") == self.platform else "iosxr",
             )
         except (KeyError, TypeError, AttributeError, ValidationError):
             raise InvalidIntent(
@@ -123,12 +131,19 @@ class InfraHubInventoryProvider(InventoryProvider):
             ip = node["primary_address"]["node"]
             interface = ip["interface"]["node"]
             if (
-                value(node, "mgmt_interface") != "mgmt0"
-                or value(interface, "name") != "mgmt0"
+                value(interface, "name") != value(node, "mgmt_interface")
                 or interface["device"]["node"]["id"] != device_id
             ):
                 raise InvalidIntent(
-                    "invalid_management_interface", "Primary IP must belong to this device mgmt0"
+                    "invalid_management_interface",
+                    "Primary IP must belong to this device management interface",
+                )
+            if identity.platform == "iosxr" and any(
+                value(node, key)
+                for key in ("ztp_target_version", "ztp_image_name", "ztp_image_sha256")
+            ):
+                raise InvalidIntent(
+                    "xr_configuration_only", "IOS XR does not accept software intent"
                 )
             return DeviceIntent.model_validate(
                 {
@@ -137,10 +152,12 @@ class InfraHubInventoryProvider(InventoryProvider):
                     "management": {
                         "address": value(ip, "address"),
                         "gateway": value(node, "ztp_gateway"),
-                        "interface": "mgmt0",
-                        "vrf": "management",
+                        "interface": value(node, "mgmt_interface"),
+                        "vrf": "default" if identity.platform == "iosxr" else "management",
                     },
-                    "software": {
+                    "software": None
+                    if identity.platform == "iosxr"
+                    else {
                         "target_version": value(node, "ztp_target_version"),
                         "image_name": value(node, "ztp_image_name"),
                         "image_checksum": value(node, "ztp_image_sha256"),

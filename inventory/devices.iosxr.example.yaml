@@ -1,0 +1,18 @@
+schema_version: 1
+devices:
+  - device:
+      id: lab-xrv9000-01
+      name: lab-xrv9000-01
+      serial_number: REPLACE_WITH_CHASSIS_SERIAL
+      vendor: cisco
+      platform: iosxr
+      # Replace with the exact chassis PID from show inventory.
+      model: IOSXRV9000
+      status: staged
+    ztp_enabled: false
+    management:
+      address: 10.10.10.100/24
+      gateway: 10.10.10.1
+      interface: MgmtEth0/RP0/CPU0/0
+      vrf: default
+    # No software, image or target-version fields for IOS XR.

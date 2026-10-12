@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     infrahub_allow_http: bool = False
     infrahub_branch: str = "main"
     infrahub_platform: str = "cisco_nxos"
+    xr_enabled: bool = False
+    xr_platform_slug: str = "cisco_iosxr"
+    xr_bootstrap_path: Path = Path("poap/cisco/iosxr.py")
     netbox_url: str = ""
     netbox_branch: str = "main"
     netbox_verify_ssl: bool = True

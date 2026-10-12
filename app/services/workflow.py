@@ -29,6 +29,14 @@ def device_event(engine, attempt_id: str, event: DeviceEvent):
             or event.config_sha256 != attempt.manifest["config"]["sha256"]
         ):
             raise ZtpError("invalid_event", 409, "Event does not match the configuration attempt")
+        xr = attempt.manifest.get("platform") == "iosxr"
+        allowed = (
+            {"CONFIG_APPLYING", "CONFIG_COMMITTED", "FAILED"}
+            if xr
+            else {"CONFIG_STAGED", "IMAGE_VERIFIED", "FAILED"}
+        )
+        if event.event not in allowed:
+            raise ZtpError("invalid_event", 409, "Event is not supported by this platform")
         previous = session.get(AttemptEvent, event.event_id)
         if previous:
             if previous.attempt_id != attempt_id or previous.kind != event.event:
@@ -39,7 +47,7 @@ def device_event(engine, attempt_id: str, event: DeviceEvent):
         if event.event == "IMAGE_VERIFIED":
             if attempt.manifest["mode"] != "upgrade-and-configure":
                 raise ZtpError("invalid_event", 409, "Not an upgrade attempt")
-        elif event.event == "CONFIG_STAGED":
+        elif event.event in {"CONFIG_STAGED", "CONFIG_APPLYING", "CONFIG_COMMITTED"}:
             if attempt.state == "AUTHORIZED":
                 attempt.state = "CONFIGURING"
         else:

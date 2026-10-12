@@ -1,6 +1,7 @@
 # ZTP Lite
 
-A lightweight Linux controller for Cisco NX-OS power-on provisioning. It supports
+A lightweight Linux controller for Cisco NX-OS power-on provisioning, with opt-in
+IOS XR configuration-only lab support. It supports
 NetBox, InfraHub or local YAML inventory, approved image delivery and installation,
 configuration staging, explicit reprovisioning, and a token-protected dashboard
 with registration failure diagnostics.
@@ -9,7 +10,8 @@ with registration failure diagnostics.
 password authentication and manual post-boot verification. It disables NetBox TLS
 verification and SSH host-key validation. A dashboard token does not encrypt
 traffic. Run it on a controlled provisioning network; it is not a hardened
-production deployment or a multivendor controller.
+production deployment. IOS XR support is configuration-only and awaits XRv9000
+runtime qualification.
 
 ## Start here
 
@@ -41,3 +43,5 @@ Future multivendor work is [planned separately](docs/multivendor-implementation-
 
 ZTP Lite is licensed under the [MIT License](LICENSE).
 Third-party dependencies and vendor firmware retain their respective licenses.
+
+For XRv9000 configuration-only testing, see the [IOS XR guide](docs/iosxr-configuration-only.md).

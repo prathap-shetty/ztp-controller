@@ -14,7 +14,7 @@ class Contract(BaseModel):
 class ObservedDevice(Contract):
     serial_number: Token
     vendor: Literal["cisco"]
-    platform: Literal["nxos"]
+    platform: Literal["nxos", "iosxr"]
     model: Token
     current_version: Token
     management_mac: Annotated[str, Field(pattern=r"^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$")]
@@ -60,6 +60,13 @@ class ManagementAddress(Contract):
         return self
 
 
+class XrManagementAddress(ManagementAddress):
+    vrf: Literal["default"] = "default"
+    interface: Annotated[
+        str, Field(pattern=r"^MgmtEth[0-9]+/(?:RP[0-9]+|[0-9]+)/CPU[0-9]+/[0-9]+$")
+    ]
+
+
 class SoftwareIntent(Contract):
     target_version: Token
     image_name: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.bin$", max_length=200)]
@@ -75,10 +82,22 @@ class InitialConfiguration(Contract):
 class DeviceIntent(Contract):
     schema_version: Literal[1] = 1
     device: DeviceIdentity
-    management: ManagementAddress
-    software: SoftwareIntent
+    management: ManagementAddress | XrManagementAddress
+    software: SoftwareIntent | None = None
     ztp_enabled: Literal[True]
     initial_configuration: InitialConfiguration | None = None
+
+    @model_validator(mode="after")
+    def platform_contract(self):
+        if self.device.platform == "iosxr":
+            if not isinstance(self.management, XrManagementAddress) or self.software is not None:
+                raise ValueError("IOS XR supports default-VRF configuration only; omit software")
+        elif self.device.platform == "nxos":
+            if type(self.management) is not ManagementAddress or self.software is None:
+                raise ValueError("NX-OS requires mgmt0 and software intent")
+        else:
+            raise ValueError("Unsupported platform")
+        return self
 
 
 class CompatibilityProfile(Contract):
@@ -103,7 +122,9 @@ class ConfigArtifact(Contract):
 
 class DeviceEvent(Contract):
     event_id: Annotated[str, Field(pattern=r"^[a-f0-9-]{36}$")]
-    event: Literal["CONFIG_STAGED", "IMAGE_VERIFIED", "FAILED"]
+    event: Literal[
+        "CONFIG_STAGED", "IMAGE_VERIFIED", "CONFIG_APPLYING", "CONFIG_COMMITTED", "FAILED"
+    ]
     config_sha256: Digest
 
 
@@ -154,11 +175,40 @@ class Manifest(Contract):
         return self
 
 
+class XrManifest(Contract):
+    schema_version: Literal[2] = 2
+    platform: Literal["iosxr"] = "iosxr"
+    mode: Literal["configuration-only"] = "configuration-only"
+    validation_policy: Literal["manual"] = "manual"
+    execution_enabled: Literal[True] = True
+    actions: tuple[Literal["apply-config"], ...] = ("apply-config",)
+    device_id: str
+    serial_number: str
+    intent_hash: Digest
+    management: XrManagementAddress
+    upgrade_required: Literal[False] = False
+    bootstrap_revision: str
+    template_revision: str
+    config: ConfigArtifact
+
+    @model_validator(mode="after")
+    def config_only(self):
+        if self.actions != ("apply-config",):
+            raise ValueError("XR supports only apply-config")
+        return self
+
+
+def parse_manifest(value):
+    if value.get("platform") == "iosxr":
+        return XrManifest.model_validate(value)
+    return Manifest.model_validate(value)
+
+
 class RegistrationResponse(Contract):
     provisioning_id: str
     state: str = "AUTHORIZED"
     plan_hash: Digest
-    manifest: Manifest
+    manifest: Manifest | XrManifest
     status_token: str
     status_token_expires_at: int
 

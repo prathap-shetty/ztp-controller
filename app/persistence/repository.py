@@ -8,7 +8,13 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.errors import ZtpError
-from app.models.contracts import DeviceIntent, Manifest, ObservedDevice, RegistrationResponse
+from app.models.contracts import (
+    DeviceIntent,
+    Manifest,
+    ObservedDevice,
+    RegistrationResponse,
+    parse_manifest,
+)
 from app.persistence.models import (
     Attempt,
     AttemptEvent,
@@ -167,7 +173,7 @@ class Repository:
                 provisioning_id=attempt.id,
                 state=attempt.state,
                 plan_hash=attempt.plan_hash,
-                manifest=Manifest.model_validate(attempt.manifest),
+                manifest=parse_manifest(attempt.manifest),
                 status_token=token,
                 status_token_expires_at=now + ttl,
             )

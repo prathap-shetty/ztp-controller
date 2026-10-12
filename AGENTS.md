@@ -3,8 +3,10 @@
 ## Scope and branch layout
 
 This repository currently packages **ZTP Lite**, a Linux Docker Compose controller
-for Cisco NX-OS POAP, image installation and configuration staging. It is not yet a
-multivendor implementation; see `docs/multivendor-implementation-plan.md`.
+for Cisco NX-OS POAP, image installation and configuration staging, plus opt-in
+IOS XR configuration-only lab support. XRv9000 runtime qualification is pending.
+See `docs/iosxr-configuration-only.md`; broader adapter generalization remains in
+`docs/multivendor-implementation-plan.md`.
 
 - `main` contains the Lite-only deployment, MIT license and dashboard reset support.
 - `codex/ztp-lite-only` preserves the separate Lite branch.
@@ -100,3 +102,19 @@ vendor firmware retain their own licenses.
 A previous dev-server rebuild was explicitly put on hold. Do not resume remote
 lab deployment merely because code changes are complete; wait for the user's
 instruction to resume. Never embed lab credentials in this file.
+
+## IOS XR configuration-only boundaries
+
+- Enable with `ZTP_XR_ENABLED=true` in Lite; `cisco_iosxr` is the default external
+  platform label and `iosxr` the canonical identity. Keep NX-OS mapping separate.
+- XR inventory omits software intent. Use the real MgmtEth interface and default
+  VRF. Do not relax NX-OS management/image contract validation to accommodate XR.
+- `app/vendors/cisco_iosxr.py` emits schema-v2 apply-config-only plans without image
+  profiles; schema-v1 NX-OS attempts remain unchanged. Never send XR to NX-OS install
+  or version-comparison code. No database schema migration is needed for these JSON plans.
+- `poap/cisco/iosxr.py` requires Python 3 and Cisco ZtpHelpers. Generate it with
+  `scripts/release_xr_bootstrap.py`; this must not replace NX-OS `poap.py`.
+- XR CONFIG_APPLYING and CONFIG_COMMITTED are device reports, not independent
+  verification. Management-IP changes may interrupt the callback. Keep the durable
+  pending/committed checkpoint and never blindly repeat an uncertain apply.
+- This implementation is tested with fixtures, not an actual XRv9000 release yet.

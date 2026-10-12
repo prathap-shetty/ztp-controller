@@ -123,3 +123,20 @@ def test_infrahub_settings_no_netbox_credentials_needed():
             infrahub_url="http://infrahub.test",
             infrahub_token="token",
         )
+
+
+def test_xr_config_only_intent(node):
+    node["platform"]["node"]["name"] = attr("cisco_iosxr")
+    node["mgmt_interface"] = attr("MgmtEth0/RP0/CPU0/0")
+    node["primary_address"]["node"]["interface"]["node"]["name"] = attr("MgmtEth0/RP0/CPU0/0")
+    for key in ("ztp_target_version", "ztp_image_name", "ztp_image_sha256"):
+        node[key] = attr(None)
+    p = provider(node)
+    intent = p.get_device_intent("device-1")
+    assert intent.device.platform == "iosxr"
+    assert intent.management.vrf == "default"
+    assert intent.software is None
+    node["ztp_image_name"] = attr("some-image.iso")
+    with pytest.raises(InvalidIntent, match="software intent"):
+        p.get_device_intent("device-1")
+    p.close()

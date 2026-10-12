@@ -16,7 +16,7 @@ def authorize_identity(device: DeviceIdentity, observed: ObservedDevice) -> None
             "platform",
             observed.platform,
             "platform_mismatch",
-            "Device platform does not match NX-OS",
+            "Device platform does not match discovered OS",
         ),
         (
             "model",

@@ -20,6 +20,7 @@ def build_provider(settings: Settings) -> InventoryProvider:
             settings.infrahub_branch,
             settings.infrahub_platform,
             settings.infrahub_verify_ssl,
+            xr_platform=settings.xr_platform_slug,
         )
     if settings.inventory_provider == "local-yaml":
         return LocalYamlInventoryProvider(settings.local_inventory_path)
@@ -30,4 +31,5 @@ def build_provider(settings: Settings) -> InventoryProvider:
         settings.netbox_auth_scheme,
         verify_ssl=settings.netbox_verify_ssl,
         branch=settings.netbox_branch,
+        xr_platform_slug=settings.xr_platform_slug,
     )

@@ -1,0 +1,18 @@
+!! IOS XR
+hostname {{ hostname }}
+username admin
+ group root-lr
+ group cisco-support
+ secret 0 {{ password }}
+!
+ssh server v2
+interface {{ management.interface }}
+ no shutdown
+ ipv4 address {{ management.address.ip }} {{ management.address.netmask }}
+!
+router static
+ address-family ipv4 unicast
+  0.0.0.0/0 {{ management.gateway }}
+ !
+!
+end
