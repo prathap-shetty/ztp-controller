@@ -21,14 +21,30 @@ disables the UI. The switch admin password must be 8–128 characters from
 `A-Za-z0-9!@%_+=.-` and meet the device's own password policy. Use a URL-safe database
 password because it is embedded in the database connection URL.
 
-## 2. Prepare your image and catalog
+## 2. Prepare your image and bootstrap
 
 Copy your licensed NX-OS image to `images/` or set `ZTP_IMAGE_DIR` to a large host
 folder. Verify it against Cisco's published digest. If Cisco provides SHA-512,
 verify that first, then calculate SHA-256 for this controller:
 
+For **NetBox** with the default `ZTP_CATALOG_SOURCE=auto`, keep the verified image
+in the image directory and generate only the bootstrap:
+
 ```bash
 sha256sum images/nxos64-cs.10.5.4.M.bin
+python3 scripts/release_bootstrap.py --controller http://10.10.10.1 \
+  --allow-http --output deploy/bootstrap
+```
+
+The API derives the plan from NetBox's target version, filename, checksum and
+validated device identity. It reads the size from the non-empty local image;
+no local catalog profile is loaded or matched. The device verifies the image
+SHA-256 before installation. The local image must be present even for an
+already-at-target registration in this implementation.
+
+For **local YAML or InfraHub**, prepare the required catalog and bootstrap:
+
+```bash
 python3 scripts/prepare_lite.py \
   --image images/nxos64-cs.10.5.4.M.bin \
   --sha256 YOUR_VERIFIED_SHA256 \
@@ -47,7 +63,8 @@ for this controlled test; it does not establish vendor or hardware qualification
 
 Image filenames are preserved on bootflash. Size and SHA-256 are verified. A file
 with the same name but different contents stops provisioning without overwrite.
-Even configuration-only operation requires matching catalog/image metadata.
+Local YAML and InfraHub require matching catalog/image metadata, including for
+configuration-only NX-OS operation. Empty images are rejected by the preparation tool.
 
 ## 3. Choose the inventory source
 
@@ -71,6 +88,24 @@ IPv4 address assigned to its own `mgmt0`. Add local config context:
   }
 }
 ```
+
+With Lite NetBox, `ZTP_CATALOG_SOURCE=auto` uses the context above without a catalog.
+The controller's execution mode permits configuration-only or upgrade-and-configure;
+context-derived profiles are explicitly unqualified and still require the existing
+lab opt-in. This does not establish a Cisco-approved upgrade path. Upgrading from
+a different release requires `ZTP_SKIP_SOURCE_VALIDATION=true`, because this context
+contains no source-release allowlist. To enforce a source-release list, set
+`ZTP_CATALOG_SOURCE=catalog` and supply an explicit compatibility profile instead.
+No source validation is silently bypassed.
+
+`ZTP_CATALOG_SOURCE=netbox-context` explicitly selects the same behavior and requires
+Lite with NetBox inventory. Non-Lite deployments retain catalog behavior. InfraHub
+continues to require a catalog. XR configuration-only behavior is unchanged.
+
+Compose mounts the existing `catalog/` directory by default, so NetBox needs no
+placeholder `lite.json`. With local YAML, generate `catalog/lite.json` in that
+directory. An existing `ZTP_CATALOG_FILE=/path/to/catalog.json` file mount is also
+supported. Recreate containers after upgrading Compose or changing these settings.
 
 For InfraHub, follow the [schema and mapping guide](infrahub-inventory.md).
 No automatic fallback occurs when the selected inventory source is unavailable.

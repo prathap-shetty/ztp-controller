@@ -118,3 +118,18 @@ instruction to resume. Never embed lab credentials in this file.
   verification. Management-IP changes may interrupt the callback. Keep the durable
   pending/committed checkpoint and never blindly repeat an uncertain apply.
 - This implementation is tested with fixtures, not an actual XRv9000 release yet.
+
+## NetBox NX-OS context plans
+
+- `ZTP_CATALOG_SOURCE=auto` uses context-derived NX-OS plans only for Lite NetBox.
+  Local YAML, InfraHub and non-Lite deployments still use a catalog. `catalog`
+  explicitly retains old matching; `netbox-context` requires Lite NetBox.
+- `app/vendors/netbox_nxos.py` derives the profile from authorized intent and the
+  local regular non-empty image size. SHA-256 is checked on the switch. It does not
+  manufacture a source allowlist: different-release upgrades require the explicit
+  Lite source-validation bypass, or use catalog mode for source-release policy.
+- NetBox context mode still requires a non-empty local image, even at target.
+  Shared catalog matching, image integrity, inventory reauthorization and NX-OS
+  execution policy remain in force. XR remains configuration-only.
+- Compose mounts the catalog directory by default; local YAML uses lite.json inside.
+  Explicit existing ZTP_CATALOG_FILE JSON-file mounts remain supported.

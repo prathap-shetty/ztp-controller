@@ -24,6 +24,7 @@ from app.services.workflow import device_event
 from app.settings import Settings
 from app.vendors.cisco_iosxr import CiscoIosxrAdapter
 from app.vendors.cisco_nxos import CiscoNxosAdapter
+from app.vendors.netbox_nxos import NetBoxNxosAdapter
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -37,8 +38,20 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
         app.state.config = config
         app.state.db = db
         app.state.inventory = inventory
-        app.state.adapter = CiscoNxosAdapter(
-            config.catalog_path,
+        use_netbox_context = config.catalog_source == "netbox-context" or (
+            config.catalog_source == "auto"
+            and config.lite_mode
+            and config.inventory_provider == "netbox"
+        )
+        adapter_type = NetBoxNxosAdapter if use_netbox_context else CiscoNxosAdapter
+        app.state.adapter = adapter_type(
+            config.image_directory
+            if use_netbox_context
+            else (
+                config.catalog_path / "lite.json"
+                if config.catalog_path.is_dir()
+                else config.catalog_path
+            ),
             skip_source_validation=config.skip_source_validation,
             allow_newer_version=config.allow_newer_version,
         )

@@ -31,6 +31,7 @@ def test_lite_no_keys_no_validation_jobs(records, netbox, settings, db, tmp_path
         execution_mode="upgrade-and-configure",
         allow_unqualified_lab=True,
         catalog_path=catalog,
+        catalog_source="catalog",
     )
     records["observed"]["current_version"] = "9.9(99)"
     with TestClient(create_app(config, netbox[0], db)) as client:

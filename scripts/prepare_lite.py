@@ -25,6 +25,8 @@ def main():
     for value in args.model + args.source + [args.target]:
         if not re.fullmatch(r"[A-Za-z0-9_.():-]{1,128}", value):
             parser.error("Invalid model or version")
+    if not args.image.is_file() or args.image.stat().st_size <= 0:
+        parser.error("Image must be a non-empty file")
     h = hashlib.sha256()
     with args.image.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):

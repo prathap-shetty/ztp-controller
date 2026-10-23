@@ -76,4 +76,5 @@ def settings(db):
         netbox_url="https://netbox.test",
         netbox_token="test-token",
         catalog_path=FIXTURES / "profiles.json",
+        catalog_source="catalog",
     )

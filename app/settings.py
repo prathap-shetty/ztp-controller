@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     image_directory: Path = Path("images")
     upgrade_validation_delay_seconds: int = 1800
     upgrade_deadline_seconds: int = 7200
+    catalog_source: Literal["auto", "catalog", "netbox-context"] = "auto"
     catalog_path: Path = Path("catalog/profiles.json")
     inventory_provider: Literal["netbox", "local-yaml", "infrahub"] = "netbox"
     local_inventory_path: Path = Path("inventory/devices.yaml")
@@ -118,6 +119,10 @@ class Settings(BaseSettings):
             raise ValueError("Token TTL must be between 60 and 86400 seconds")
         if not 1 <= self.registration_limit_per_minute <= 10000:
             raise ValueError("Registration rate must be between 1 and 10000 per minute")
+        if self.catalog_source == "netbox-context" and (
+            not self.lite_mode or self.inventory_provider != "netbox"
+        ):
+            raise ValueError("NetBox context plans require Lite mode with NetBox inventory")
         if self.skip_source_validation and not self.lite_mode:
             raise ValueError("Source validation bypass requires Lite mode")
         if self.lite_mode:

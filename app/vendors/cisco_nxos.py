@@ -29,6 +29,9 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
         return "nxos-poap"
 
     def build_manifest(self, intent: DeviceIntent, observed: ObservedDevice) -> Manifest:
+        return self._build_manifest(intent, observed, self.profiles)
+
+    def _build_manifest(self, intent, observed, profiles):
         try:
             target_satisfied = version_satisfies(
                 observed.current_version, intent.software.target_version, self.allow_newer_version
@@ -37,7 +40,7 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
             raise InventoryDenied() from None
         matches = [
             p
-            for p in self.profiles
+            for p in profiles
             if (
                 p.model == observed.model
                 and (
