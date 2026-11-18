@@ -1,0 +1,95 @@
+{
+  "Dhcp4": {
+    "interfaces-config": {
+      "interfaces": [
+        "ens3.200",
+        "ens3.500"
+      ]
+    },
+    "lease-database": {
+      "type": "memfile",
+      "persist": true,
+      "name": "/var/lib/kea/kea-leases4.csv"
+    },
+    "valid-lifetime": 3600,
+    "renew-timer": 900,
+    "rebind-timer": 1800,
+    "subnet4": [
+      {
+        "id": 200,
+        "subnet": "10.20.0.0/24",
+        "interface": "ens3.200",
+        "pools": [
+          {
+            "pool": "10.20.0.10 - 10.20.0.149"
+          }
+        ],
+        "option-data": [
+          {
+            "name": "routers",
+            "data": "10.20.0.1",
+            "always-send": true
+          },
+          {
+            "name": "domain-name-servers",
+            "data": "8.8.8.8",
+            "always-send": true
+          },
+          {
+            "name": "tftp-server-name",
+            "data": "http://10.20.0.1",
+            "always-send": true
+          },
+          {
+            "name": "boot-file-name",
+            "data": "bootstrap/vlan200/poap.py",
+            "always-send": true
+          }
+        ]
+      },
+      {
+        "id": 500,
+        "subnet": "10.50.0.0/24",
+        "interface": "ens3.500",
+        "pools": [
+          {
+            "pool": "10.50.0.10 - 10.50.0.149"
+          }
+        ],
+        "option-data": [
+          {
+            "name": "routers",
+            "data": "10.50.0.1",
+            "always-send": true
+          },
+          {
+            "name": "domain-name-servers",
+            "data": "8.8.8.8",
+            "always-send": true
+          },
+          {
+            "name": "tftp-server-name",
+            "data": "http://10.50.0.1",
+            "always-send": true
+          },
+          {
+            "name": "boot-file-name",
+            "data": "bootstrap/vlan500/poap.py",
+            "always-send": true
+          }
+        ]
+      }
+    ],
+    "loggers": [
+      {
+        "name": "kea-dhcp4",
+        "output-options": [
+          {
+            "output": "stdout"
+          }
+        ],
+        "severity": "INFO"
+      }
+    ]
+  }
+}

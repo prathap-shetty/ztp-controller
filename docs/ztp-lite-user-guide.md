@@ -137,6 +137,42 @@ Then open `http://localhost:8080/`. Cookie sessions expire after eight hours;
 rotating the environment token and recreating the API invalidates them. Login is
 rate-limited. Neither token login nor the isolated-network assumption encrypts HTTP.
 
+## Optional: two management VLANs
+
+One controller can serve two management VLANs. Each VLAN needs its own host address,
+DHCP subnet and bootstrap, because a bootstrap has one built-in controller URL. The
+examples use `ens3.200`/`10.20.0.1` and `ens3.500`/`10.50.0.1`; replace them with
+your values. Create both interfaces before starting Kea and Nginx: Kea refuses a
+configuration naming a missing interface. Confirm there is no competing DHCP server
+or relay on either VLAN.
+
+```bash
+python3 scripts/release_bootstrap.py --controller http://10.20.0.1 --allow-http --output deploy/bootstrap/vlan200
+python3 scripts/release_bootstrap.py --controller http://10.50.0.1 --allow-http --output deploy/bootstrap/vlan500
+```
+
+Set these in `.env.lite`:
+
+```bash
+ZTP_BIND_ADDRESS=10.20.0.1
+ZTP_BIND_ADDRESS_2=10.50.0.1
+ZTP_KEA_CONFIG=./examples/multi-vlan/kea.json
+```
+
+Add the overlay to every Compose command:
+
+```bash
+docker compose --env-file .env.lite -f compose.lite.yaml -f compose.lite.multi-vlan.yaml --profile dhcp up -d --build
+curl http://10.20.0.1/ready
+curl http://10.50.0.1/ready
+```
+
+Boot options are per subnet, so one VLAN can serve NX-OS and the other IOS XR. For XR,
+generate with `scripts/release_xr_bootstrap.py` and set `boot-file-name` to the full
+URL, for example `http://10.50.0.1/bootstrap/vlan500/iosxr.py`. Both VLANs share one
+inventory, database and dashboard. Do not bind Nginx to `0.0.0.0`: that exposes the
+controller and dashboard on every host interface.
+
 ## 5. Provision and verify
 
 Connect a new or deliberately erased switch's mgmt0 to the ZTP network. Allow
