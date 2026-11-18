@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from app.errors import InvalidIntent, InventoryDenied, InventoryUnavailable
 from app.inventory.base import InventoryProvider
-from app.models.contracts import DeviceIdentity, DeviceIntent
+from app.models.contracts import CONFIG_ONLY_PLATFORMS, DeviceIdentity, DeviceIntent
 
 IDENTITY = """id name { value } serial { value } status { value }
 platform { node { name { value } } }
@@ -37,9 +37,12 @@ class InfraHubInventoryProvider(InventoryProvider):
         verify_ssl=True,
         transport=None,
         xr_platform="cisco_iosxr",
+        xe_platform="cisco_iosxe",
     ):
         self.platform = platform
         self.xr_platform = xr_platform
+        self.xe_platform = xe_platform
+        self.platforms = {xe_platform: "iosxe", xr_platform: "iosxr", platform: "nxos"}
         self.endpoint = url.rstrip("/") + "/graphql/" + branch
         self.client = httpx.Client(
             headers={"X-INFRAHUB-KEY": token},
@@ -95,7 +98,7 @@ class InfraHubInventoryProvider(InventoryProvider):
             platform = node["platform"]["node"]
             if not platform:
                 raise InvalidIntent("platform_missing", "InfraHub device has no platform assigned")
-            if value(platform, "name") not in {self.platform, self.xr_platform}:
+            if value(platform, "name") not in self.platforms:
                 raise InvalidIntent(
                     "platform_mismatch", "InfraHub platform does not match configured platform"
                 )
@@ -107,7 +110,7 @@ class InfraHubInventoryProvider(InventoryProvider):
                 status=value(node, "status"),
                 model=(value(device_type, "part_number") or value(device_type, "name")).upper(),
                 vendor=value(device_type["manufacturer"]["node"], "name").lower(),
-                platform="nxos" if value(platform, "name") == self.platform else "iosxr",
+                platform=self.platforms[value(platform, "name")],
             )
         except (KeyError, TypeError, AttributeError, ValidationError):
             raise InvalidIntent(
@@ -138,12 +141,14 @@ class InfraHubInventoryProvider(InventoryProvider):
                     "invalid_management_interface",
                     "Primary IP must belong to this device management interface",
                 )
-            if identity.platform == "iosxr" and any(
+            config_only = identity.platform in CONFIG_ONLY_PLATFORMS
+            if config_only and any(
                 value(node, key)
                 for key in ("ztp_target_version", "ztp_image_name", "ztp_image_sha256")
             ):
+                code, label = ("xr", "IOS XR") if identity.platform == "iosxr" else ("xe", "IOS XE")
                 raise InvalidIntent(
-                    "xr_configuration_only", "IOS XR does not accept software intent"
+                    code + "_configuration_only", label + " does not accept software intent"
                 )
             return DeviceIntent.model_validate(
                 {
@@ -153,10 +158,10 @@ class InfraHubInventoryProvider(InventoryProvider):
                         "address": value(ip, "address"),
                         "gateway": value(node, "ztp_gateway"),
                         "interface": value(node, "mgmt_interface"),
-                        "vrf": "default" if identity.platform == "iosxr" else "management",
+                        "vrf": "default" if config_only else "management",
                     },
                     "software": None
-                    if identity.platform == "iosxr"
+                    if config_only
                     else {
                         "target_version": value(node, "ztp_target_version"),
                         "image_name": value(node, "ztp_image_name"),

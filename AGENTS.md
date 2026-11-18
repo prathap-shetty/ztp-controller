@@ -4,8 +4,9 @@
 
 This repository currently packages **ZTP Lite**, a Linux Docker Compose controller
 for Cisco NX-OS POAP, image installation and configuration staging, plus opt-in
-IOS XR configuration-only lab support. XRv9000 runtime qualification is pending.
-See `docs/iosxr-configuration-only.md`; broader adapter generalization remains in
+IOS XR and IOS XE configuration-only lab support. XRv9000 and Catalyst 8000V runtime
+qualification is pending. See `docs/iosxr-configuration-only.md` and
+`docs/iosxe-configuration-only.md`; broader adapter generalization remains in
 `docs/multivendor-implementation-plan.md`.
 
 - `main` contains the Lite-only deployment, MIT license and dashboard reset support.
@@ -120,6 +121,22 @@ instruction to resume. Never embed lab credentials in this file.
   verification. Management-IP changes may interrupt the callback. Keep the durable
   pending/committed checkpoint and never blindly repeat an uncertain apply.
 - This implementation is tested with fixtures, not an actual XRv9000 release yet.
+
+## IOS XE configuration-only boundaries
+
+- Enable with `ZTP_XE_ENABLED=true` in Lite; `cisco_iosxe` is the default external
+  label and `iosxe` the canonical identity. XR and XE enablement are independent.
+- `app/vendors/config_only.py` is shared by the XR and XE adapters; both emit
+  schema-v2 apply-config plans. `CONFIG_ONLY_PLATFORMS` in contracts lists them.
+  Never send either to NX-OS install or version-comparison code.
+- XE management is a default-VRF `GigabitEthernet`/`TenGigabitEthernet` interface,
+  the one holding the ZTP DHCP lease. `Mgmt-vrf` is not supported yet.
+- `poap/cisco/iosxe.py` runs in Guest Shell (Python 3.6+, `cli` module); keep it
+  free of newer syntax. Generate it with `scripts/release_xe_bootstrap.py`.
+- IOS XE applies line by line and saves with `write memory`. A rejected line or
+  failed save leaves the `applying` checkpoint; never blindly reapply.
+- Tested with fixtures only; Catalyst 8000V Guest Shell networking during ZTP is
+  not yet confirmed.
 
 ## NetBox NX-OS context plans
 

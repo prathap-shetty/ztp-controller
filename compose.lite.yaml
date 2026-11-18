@@ -28,6 +28,8 @@ services:
         in .env}@postgres:5432/ztp
       ZTP_XR_ENABLED: ${ZTP_XR_ENABLED:-false}
       ZTP_XR_PLATFORM_SLUG: ${ZTP_XR_PLATFORM_SLUG:-cisco_iosxr}
+      ZTP_XE_ENABLED: ${ZTP_XE_ENABLED:-false}
+      ZTP_XE_PLATFORM_SLUG: ${ZTP_XE_PLATFORM_SLUG:-cisco_iosxe}
       ZTP_INVENTORY_PROVIDER: ${ZTP_INVENTORY_PROVIDER:-local-yaml}
       ZTP_INFRAHUB_URL: ${ZTP_INFRAHUB_URL:-http://host.docker.internal:8000}
       ZTP_INFRAHUB_TOKEN: ${ZTP_INFRAHUB_TOKEN:-}
@@ -93,6 +95,8 @@ services:
         in .env}@postgres:5432/ztp
       ZTP_XR_ENABLED: ${ZTP_XR_ENABLED:-false}
       ZTP_XR_PLATFORM_SLUG: ${ZTP_XR_PLATFORM_SLUG:-cisco_iosxr}
+      ZTP_XE_ENABLED: ${ZTP_XE_ENABLED:-false}
+      ZTP_XE_PLATFORM_SLUG: ${ZTP_XE_PLATFORM_SLUG:-cisco_iosxe}
       ZTP_INVENTORY_PROVIDER: ${ZTP_INVENTORY_PROVIDER:-local-yaml}
       ZTP_INFRAHUB_URL: ${ZTP_INFRAHUB_URL:-http://host.docker.internal:8000}
       ZTP_INFRAHUB_TOKEN: ${ZTP_INFRAHUB_TOKEN:-}

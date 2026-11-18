@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     xr_enabled: bool = False
     xr_platform_slug: str = "cisco_iosxr"
     xr_bootstrap_path: Path = Path("poap/cisco/iosxr.py")
+    xe_enabled: bool = False
+    xe_platform_slug: str = "cisco_iosxe"
+    xe_bootstrap_path: Path = Path("poap/cisco/iosxe.py")
     netbox_url: str = ""
     netbox_branch: str = "main"
     netbox_verify_ssl: bool = True

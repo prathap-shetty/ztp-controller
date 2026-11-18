@@ -167,9 +167,10 @@ curl http://10.20.0.1/ready
 curl http://10.50.0.1/ready
 ```
 
-Boot options are per subnet, so one VLAN can serve NX-OS and the other IOS XR. For XR,
-generate with `scripts/release_xr_bootstrap.py` and set `boot-file-name` to the full
-URL, for example `http://10.50.0.1/bootstrap/vlan500/iosxr.py`. Both VLANs share one
+Boot options are per subnet, so one VLAN can serve NX-OS and the other IOS XR or IOS XE.
+For XR or XE, generate with `scripts/release_xr_bootstrap.py` or
+`scripts/release_xe_bootstrap.py` and set `boot-file-name` to the full URL, for
+example `http://10.50.0.1/bootstrap/vlan500/iosxr.py`. Both VLANs share one
 inventory, database and dashboard. Do not bind Nginx to `0.0.0.0`: that exposes the
 controller and dashboard on every host interface.
 

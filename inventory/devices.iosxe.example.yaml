@@ -1,0 +1,19 @@
+schema_version: 1
+devices:
+  - device:
+      id: lab-c8000v-01
+      name: lab-c8000v-01
+      serial_number: REPLACE_WITH_CHASSIS_SERIAL
+      vendor: cisco
+      platform: iosxe
+      # Replace with the exact chassis PID from show inventory.
+      model: C8000V
+      status: staged
+    ztp_enabled: false
+    management:
+      address: 10.10.10.110/24
+      gateway: 10.10.10.1
+      # The interface that receives the ZTP DHCP lease.
+      interface: GigabitEthernet1
+      vrf: default
+    # No software, image or target-version fields for IOS XE.

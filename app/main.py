@@ -22,11 +22,13 @@ from app.services.images import open_image
 from app.services.rendering import configuration_manifest
 from app.services.workflow import device_event
 from app.settings import Settings
+from app.vendors.cisco_iosxe import CiscoIosxeAdapter
 from app.vendors.cisco_iosxr import CiscoIosxrAdapter
 from app.vendors.cisco_nxos import CiscoNxosAdapter
 from app.vendors.netbox_nxos import NetBoxNxosAdapter
 
 bearer = HTTPBearer(auto_error=False)
+CONFIG_ONLY_ADAPTERS = {"iosxr": CiscoIosxrAdapter, "iosxe": CiscoIosxeAdapter}
 
 
 def create_app(settings: Settings | None = None, provider=None, engine=None) -> FastAPI:
@@ -124,9 +126,10 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
             stage = "intent_validation"
             authorize_intent(intent, observed)
             stage = "catalog_matching"
-            if observed.platform == "iosxr":
+            if observed.platform in CONFIG_ONLY_ADAPTERS:
                 stage = "configuration_rendering"
-                manifest, config_body = CiscoIosxrAdapter().prepare(intent, observed, state.config)
+                adapter = CONFIG_ONLY_ADAPTERS[observed.platform]()
+                manifest, config_body = adapter.prepare(intent, observed, state.config)
             else:
                 manifest = state.adapter.build_manifest(intent, observed)
                 stage = "configuration_rendering"
@@ -175,19 +178,14 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
         if credentials is None:
             raise ZtpError("invalid_status_token", 401, "Attempt token required")
         attempt = request.app.state.repository.status(str(attempt_id), credentials.credentials)
+        config_only = CONFIG_ONLY_ADAPTERS.get(attempt.manifest.get("platform"))
         if (
             request.app.state.config.execution_mode == "planning-only"
             or (
-                attempt.manifest.get("platform") != "iosxr"
+                config_only is None
                 and attempt.manifest["mode"] != request.app.state.config.execution_mode
             )
-            or (
-                attempt.manifest.get("platform") == "iosxr"
-                and (
-                    not request.app.state.config.xr_enabled
-                    or not request.app.state.config.lite_mode
-                )
-            )
+            or (config_only is not None and not config_only.enabled(request.app.state.config))
         ):
             raise ZtpError("execution_disabled", 403, "Configuration execution is disabled")
         intent = request.app.state.inventory.get_device_intent(attempt.device_id)

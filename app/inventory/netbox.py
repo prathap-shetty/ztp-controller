@@ -11,16 +11,24 @@ from app.models.contracts import (
     InitialConfiguration,
     ManagementAddress,
     SoftwareIntent,
+    XeManagementAddress,
     XrManagementAddress,
 )
 
+CONFIG_ONLY_MANAGEMENT = {"iosxr": XrManagementAddress, "iosxe": XeManagementAddress}
+CONFIG_ONLY_LABELS = {"iosxr": ("xr", "IOS XR"), "iosxe": ("xe", "IOS XE")}
+
 
 def identity(
-    record: dict, platform_slug: str, xr_platform_slug: str = "cisco_iosxr"
+    record: dict,
+    platform_slug: str,
+    xr_platform_slug: str = "cisco_iosxr",
+    xe_platform_slug: str = "cisco_iosxe",
 ) -> DeviceIdentity:
     if not record.get("platform"):
         raise InvalidIntent("platform_missing", "NetBox device has no platform assigned")
-    if record["platform"].get("slug") not in {platform_slug, xr_platform_slug}:
+    platforms = {xe_platform_slug: "iosxe", xr_platform_slug: "iosxr", platform_slug: "nxos"}
+    if record["platform"].get("slug") not in platforms:
         raise InvalidIntent(
             "platform_mismatch", "NetBox platform does not match configured platform slug"
         )
@@ -30,7 +38,7 @@ def identity(
             name=record["name"],
             serial_number=record["serial"].strip().upper(),
             vendor=record["device_type"]["manufacturer"]["slug"],
-            platform=("nxos" if record["platform"]["slug"] == platform_slug else "iosxr"),
+            platform=platforms[record["platform"]["slug"]],
             model=record["device_type"]["model"].upper(),
             status=record["status"]["value"],
         )
@@ -49,10 +57,13 @@ class NetBoxInventoryProvider(InventoryProvider):
         verify_ssl: bool = True,
         branch: str = "main",
         xr_platform_slug: str = "cisco_iosxr",
+        xe_platform_slug: str = "cisco_iosxe",
     ):
         self.base_url = base_url.rstrip("/") + "/api/"
         self.platform_slug = platform_slug
         self.xr_platform_slug = xr_platform_slug
+        self.xe_platform_slug = xe_platform_slug
+        self.slugs = (platform_slug, xr_platform_slug, xe_platform_slug)
         headers = {"Authorization": f"{auth_scheme} {token}", "Accept": "application/json"}
         if branch.strip() and branch.strip() != "main":
             headers["X-NetBox-Branch"] = branch.strip()
@@ -103,7 +114,9 @@ class NetBoxInventoryProvider(InventoryProvider):
             raise InventoryUnavailable()
         if len(records) != 1:
             raise InventoryDenied("serial_not_found", "Chassis serial was not found in inventory")
-        device = identity(records[0], self.platform_slug, self.xr_platform_slug)
+        device = identity(
+            records[0], self.platform_slug, self.xr_platform_slug, self.xe_platform_slug
+        )
         if device.serial_number != serial:
             raise InventoryDenied()
         return device
@@ -112,7 +125,7 @@ class NetBoxInventoryProvider(InventoryProvider):
         if not device_id.isdecimal():
             raise InvalidIntent()
         record = self._get(f"dcim/devices/{device_id}/")
-        device = identity(record, self.platform_slug, self.xr_platform_slug)
+        device = identity(record, *self.slugs)
         try:
             if device.id != device_id:
                 raise InvalidIntent()
@@ -130,11 +143,12 @@ class NetBoxInventoryProvider(InventoryProvider):
                     "invalid_image_checksum",
                     "Image SHA-256 must be 64 lowercase hex characters without whitespace",
                 )
-            if device.platform == "iosxr" and any(
+            if device.platform in CONFIG_ONLY_LABELS and any(
                 k in ztp for k in ("image", "target_nxos", "software")
             ):
+                code, label = CONFIG_ONLY_LABELS[device.platform]
                 raise InvalidIntent(
-                    "xr_configuration_only", "IOS XR does not accept software intent"
+                    code + "_configuration_only", label + " does not accept software intent"
                 )
             management = ztp["management"]
             primary = record["primary_ip4"]
@@ -158,16 +172,14 @@ class NetBoxInventoryProvider(InventoryProvider):
                     if "initial_configuration" in ztp
                     else None
                 ),
-                management=(
-                    XrManagementAddress if device.platform == "iosxr" else ManagementAddress
-                )(
+                management=CONFIG_ONLY_MANAGEMENT.get(device.platform, ManagementAddress)(
                     address=ip_record["address"],
                     gateway=management["gateway"],
                     vrf=management["vrf"],
                     interface=management["interface"],
                 ),
                 software=None
-                if device.platform == "iosxr"
+                if device.platform in CONFIG_ONLY_MANAGEMENT
                 else SoftwareIntent(
                     target_version=ztp["target_nxos"],
                     image_name=ztp["image"]["filename"],
