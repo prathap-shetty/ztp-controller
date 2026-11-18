@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.errors import ZtpError
-from app.models.contracts import DeviceEvent
+from app.models.contracts import CONFIG_ONLY_PLATFORMS, DeviceEvent
 from app.persistence.models import Attempt, AttemptEvent, ValidationJob
 
 
@@ -29,10 +29,9 @@ def device_event(engine, attempt_id: str, event: DeviceEvent):
             or event.config_sha256 != attempt.manifest["config"]["sha256"]
         ):
             raise ZtpError("invalid_event", 409, "Event does not match the configuration attempt")
-        xr = attempt.manifest.get("platform") == "iosxr"
         allowed = (
             {"CONFIG_APPLYING", "CONFIG_COMMITTED", "FAILED"}
-            if xr
+            if attempt.manifest.get("platform") in CONFIG_ONLY_PLATFORMS
             else {"CONFIG_STAGED", "IMAGE_VERIFIED", "FAILED"}
         )
         if event.event not in allowed:

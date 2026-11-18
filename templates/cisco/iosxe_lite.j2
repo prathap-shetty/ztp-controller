@@ -1,0 +1,14 @@
+! IOS XE
+hostname {{ hostname }}
+username admin privilege 15 secret 0 {{ password }}
+crypto key generate rsa general-keys label ZTP-LITE-SSH modulus 2048
+ip ssh rsa keypair-name ZTP-LITE-SSH
+ip ssh version 2
+line vty 0 4
+ login local
+ transport input ssh
+interface {{ management.interface }}
+ ip address {{ management.address.ip }} {{ management.address.netmask }}
+ no shutdown
+ip route 0.0.0.0 0.0.0.0 {{ management.gateway }}
+end

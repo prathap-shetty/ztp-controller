@@ -140,3 +140,20 @@ def test_xr_config_only_intent(node):
     with pytest.raises(InvalidIntent, match="software intent"):
         p.get_device_intent("device-1")
     p.close()
+
+
+def test_xe_config_only_intent(node):
+    node["platform"]["node"]["name"] = attr("cisco_iosxe")
+    node["mgmt_interface"] = attr("GigabitEthernet1")
+    node["primary_address"]["node"]["interface"]["node"]["name"] = attr("GigabitEthernet1")
+    for key in ("ztp_target_version", "ztp_image_name", "ztp_image_sha256"):
+        node[key] = attr(None)
+    p = provider(node)
+    intent = p.get_device_intent("device-1")
+    assert intent.device.platform == "iosxe"
+    assert intent.management.vrf == "default"
+    assert intent.software is None
+    node["ztp_image_name"] = attr("c8000v.bin")
+    with pytest.raises(InvalidIntent, match="IOS XE does not accept software intent"):
+        p.get_device_intent("device-1")
+    p.close()

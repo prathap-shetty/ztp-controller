@@ -5,6 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 Token = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.():-]+$")]
 Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+# Platforms that receive schema-v2 apply-config plans; never NX-OS install or version code.
+CONFIG_ONLY_PLATFORMS = frozenset({"iosxr", "iosxe"})
 
 
 class Contract(BaseModel):
@@ -14,7 +16,7 @@ class Contract(BaseModel):
 class ObservedDevice(Contract):
     serial_number: Token
     vendor: Literal["cisco"]
-    platform: Literal["nxos", "iosxr"]
+    platform: Literal["nxos", "iosxr", "iosxe"]
     model: Token
     current_version: Token
     management_mac: Annotated[str, Field(pattern=r"^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$")]
@@ -67,6 +69,13 @@ class XrManagementAddress(ManagementAddress):
     ]
 
 
+class XeManagementAddress(ManagementAddress):
+    vrf: Literal["default"] = "default"
+    interface: Annotated[
+        str, Field(pattern=r"^(?:GigabitEthernet|TenGigabitEthernet)[0-9]+(?:/[0-9]+){0,2}$")
+    ]
+
+
 class SoftwareIntent(Contract):
     target_version: Token
     image_name: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.bin$", max_length=200)]
@@ -82,7 +91,7 @@ class InitialConfiguration(Contract):
 class DeviceIntent(Contract):
     schema_version: Literal[1] = 1
     device: DeviceIdentity
-    management: ManagementAddress | XrManagementAddress
+    management: ManagementAddress | XrManagementAddress | XeManagementAddress
     software: SoftwareIntent | None = None
     ztp_enabled: Literal[True]
     initial_configuration: InitialConfiguration | None = None
@@ -92,6 +101,9 @@ class DeviceIntent(Contract):
         if self.device.platform == "iosxr":
             if not isinstance(self.management, XrManagementAddress) or self.software is not None:
                 raise ValueError("IOS XR supports default-VRF configuration only; omit software")
+        elif self.device.platform == "iosxe":
+            if not isinstance(self.management, XeManagementAddress) or self.software is not None:
+                raise ValueError("IOS XE supports default-VRF configuration only; omit software")
         elif self.device.platform == "nxos":
             if type(self.management) is not ManagementAddress or self.software is None:
                 raise ValueError("NX-OS requires mgmt0 and software intent")
@@ -175,9 +187,8 @@ class Manifest(Contract):
         return self
 
 
-class XrManifest(Contract):
+class ConfigOnlyManifest(Contract):
     schema_version: Literal[2] = 2
-    platform: Literal["iosxr"] = "iosxr"
     mode: Literal["configuration-only"] = "configuration-only"
     validation_policy: Literal["manual"] = "manual"
     execution_enabled: Literal[True] = True
@@ -185,7 +196,6 @@ class XrManifest(Contract):
     device_id: str
     serial_number: str
     intent_hash: Digest
-    management: XrManagementAddress
     upgrade_required: Literal[False] = False
     bootstrap_revision: str
     template_revision: str
@@ -194,13 +204,25 @@ class XrManifest(Contract):
     @model_validator(mode="after")
     def config_only(self):
         if self.actions != ("apply-config",):
-            raise ValueError("XR supports only apply-config")
+            raise ValueError("Configuration-only platforms support only apply-config")
         return self
+
+
+class XrManifest(ConfigOnlyManifest):
+    platform: Literal["iosxr"] = "iosxr"
+    management: XrManagementAddress
+
+
+class XeManifest(ConfigOnlyManifest):
+    platform: Literal["iosxe"] = "iosxe"
+    management: XeManagementAddress
 
 
 def parse_manifest(value):
     if value.get("platform") == "iosxr":
         return XrManifest.model_validate(value)
+    if value.get("platform") == "iosxe":
+        return XeManifest.model_validate(value)
     return Manifest.model_validate(value)
 
 
@@ -208,7 +230,7 @@ class RegistrationResponse(Contract):
     provisioning_id: str
     state: str = "AUTHORIZED"
     plan_hash: Digest
-    manifest: Manifest | XrManifest
+    manifest: Manifest | XrManifest | XeManifest
     status_token: str
     status_token_expires_at: int
 

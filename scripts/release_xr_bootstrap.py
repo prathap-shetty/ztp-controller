@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 
-def release(controller, output, allow_http=False):
+def release(controller, output, allow_http=False, source=Path("poap/cisco/iosxr.py")):
     url = urlsplit(controller)
     if (
         url.scheme not in {"http", "https"}
@@ -22,18 +22,19 @@ def release(controller, output, allow_http=False):
     if url.scheme == "http" and not allow_http:
         raise ValueError("HTTP requires --allow-http")
     script = (
-        Path("poap/cisco/iosxr.py")
-        .read_text()
+        source.read_text()
         .replace(
             'CONTROLLER_URL = "https://controller.example.invalid"',
             "CONTROLLER_URL = " + json.dumps(controller.rstrip("/")),
         )
         .replace("ALLOW_HTTP = False", "ALLOW_HTTP = " + repr(allow_http))
     )
-    compile(script, "iosxr.py", "exec")
+    compile(script, source.name, "exec")
     output.mkdir(parents=True, exist_ok=True)
-    (output / "iosxr.py").write_text(script)
-    (output / "iosxr.py.sha256").write_text(hashlib.sha256(script.encode()).hexdigest() + "\n")
+    (output / source.name).write_text(script)
+    (output / (source.name + ".sha256")).write_text(
+        hashlib.sha256(script.encode()).hexdigest() + "\n"
+    )
 
 
 if __name__ == "__main__":
