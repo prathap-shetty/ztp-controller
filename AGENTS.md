@@ -21,6 +21,8 @@ See `docs/iosxr-configuration-only.md`; broader adapter generalization remains i
 ## Main entry points
 
 - `compose.lite.yaml`, `.env.lite.example`: Linux deployment and example settings.
+- `compose.lite.multi-vlan.yaml`, `examples/multi-vlan/kea.json`: opt-in second
+  management VLAN; each VLAN needs its own bootstrap and controller address.
 - `deploy/docker/Dockerfile`: application image; preserve non-root readability of
   source files and `alembic.ini` when changing COPY instructions.
 - `app/main.py`: FastAPI setup, registration and provisioning endpoints.

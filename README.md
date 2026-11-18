@@ -21,7 +21,8 @@ runtime qualification.
 3. Read the [internal repository import guide](docs/internal-repository.md) before
    publishing to your internal Git server.
 
-The only Compose entry point is `compose.lite.yaml`, using `.env.lite`.
+The Compose entry point is `compose.lite.yaml`, using `.env.lite`. The optional
+`compose.lite.multi-vlan.yaml` overlay adds a second management VLAN address.
 Large firmware files, credentials and device inventory stay outside Git. No
 firmware is bundled. Use licensed images and vendor-approved upgrade paths.
 

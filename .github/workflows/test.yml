@@ -27,3 +27,4 @@ jobs:
       - run: uv run ruff format --check app migrations tests scripts poap
       - run: uv run pytest -q
       - run: POSTGRES_PASSWORD=validation-only ZTP_ADMIN_PASSWORD=TestPassword123 docker compose -f compose.lite.yaml --profile dhcp config --quiet
+      - run: POSTGRES_PASSWORD=validation-only ZTP_ADMIN_PASSWORD=TestPassword123 ZTP_BIND_ADDRESS_2=10.50.0.1 docker compose -f compose.lite.yaml -f compose.lite.multi-vlan.yaml --profile dhcp config --quiet
