@@ -103,14 +103,14 @@ python3 scripts/release_xe_bootstrap.py \
 docker compose --env-file .env.lite -f compose.lite.yaml up -d --build ztp-api nginx
 ```
 
-This creates `deploy/bootstrap/iosxe.py` without replacing `poap.py` or `iosxr.py`.
+This creates `deploy/bootstrap/iosxe.py` without replacing `nxos.py` or `iosxr.py`.
 
 ## 3. Select the IOS XE script in DHCP
 
 For an IOS XE-only scope, set `ZTP_KEA_CONFIG=./examples/iosxe/kea.json`. It gives
-the full URL `http://10.10.10.1/bootstrap/iosxe.py` in option 67. For a mixed
-subnet, use reservations or a separate VLAN (see the two-VLAN section of the user
-guide); do not replace the NX-OS boot URL for the whole subnet.
+the full URL `http://10.10.10.1/bootstrap/iosxe.py` in option 67. For a subnet
+shared with other platforms, use the client-class example in the user guide's
+mixed-platform section; do not replace the NX-OS boot URL for the whole subnet.
 
 ```bash
 curl --fail http://10.10.10.1/bootstrap/iosxe.py -o /tmp/iosxe.py

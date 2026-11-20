@@ -157,3 +157,21 @@ def test_xe_config_only_intent(node):
     with pytest.raises(InvalidIntent, match="IOS XE does not accept software intent"):
         p.get_device_intent("device-1")
     p.close()
+
+
+def test_eos_config_only_intent(node):
+    node["platform"]["node"]["name"] = attr("arista_eos")
+    node["device_type"]["node"]["manufacturer"]["node"]["name"] = attr("Arista")
+    node["mgmt_interface"] = attr("Management1")
+    node["primary_address"]["node"]["interface"]["node"]["name"] = attr("Management1")
+    for key in ("ztp_target_version", "ztp_image_name", "ztp_image_sha256"):
+        node[key] = attr(None)
+    p = provider(node)
+    intent = p.get_device_intent("device-1")
+    assert intent.device.platform == "eos"
+    assert intent.device.vendor == "arista"
+    assert intent.software is None
+    node["ztp_image_name"] = attr("EOS.swi")
+    with pytest.raises(InvalidIntent, match="Arista EOS does not accept software intent"):
+        p.get_device_intent("device-1")
+    p.close()

@@ -6,7 +6,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 Token = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.():-]+$")]
 Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
 # Platforms that receive schema-v2 apply-config plans; never NX-OS install or version code.
-CONFIG_ONLY_PLATFORMS = frozenset({"iosxr", "iosxe"})
+# Each maps to its error-code prefix and operator label.
+CONFIG_ONLY_LABELS = {
+    "iosxr": ("xr", "IOS XR"),
+    "iosxe": ("xe", "IOS XE"),
+    "eos": ("eos", "Arista EOS"),
+}
+CONFIG_ONLY_PLATFORMS = frozenset(CONFIG_ONLY_LABELS)
 
 
 class Contract(BaseModel):
@@ -15,8 +21,8 @@ class Contract(BaseModel):
 
 class ObservedDevice(Contract):
     serial_number: Token
-    vendor: Literal["cisco"]
-    platform: Literal["nxos", "iosxr", "iosxe"]
+    vendor: Literal["cisco", "arista"]
+    platform: Literal["nxos", "iosxr", "iosxe", "eos"]
     model: Token
     current_version: Token
     management_mac: Annotated[str, Field(pattern=r"^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$")]
@@ -30,6 +36,12 @@ class ObservedDevice(Contract):
     @classmethod
     def lowercase(cls, value: str) -> str:
         return value.lower()
+
+    @model_validator(mode="after")
+    def vendor_platform(self):
+        if (self.platform == "eos") != (self.vendor == "arista"):
+            raise ValueError("Platform does not match vendor")
+        return self
 
 
 class DeviceIdentity(Contract):
@@ -76,6 +88,11 @@ class XeManagementAddress(ManagementAddress):
     ]
 
 
+class EosManagementAddress(ManagementAddress):
+    vrf: Literal["default"] = "default"
+    interface: Annotated[str, Field(pattern=r"^Management[0-9]+(?:/[0-9]+)?$")]
+
+
 class SoftwareIntent(Contract):
     target_version: Token
     image_name: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*\.bin$", max_length=200)]
@@ -88,22 +105,30 @@ class InitialConfiguration(Contract):
     ssh_sources: list[IPv4Network] = Field(min_length=1, max_length=32)
 
 
+CONFIG_ONLY_MANAGEMENT = {
+    "iosxr": XrManagementAddress,
+    "iosxe": XeManagementAddress,
+    "eos": EosManagementAddress,
+}
+
+
 class DeviceIntent(Contract):
     schema_version: Literal[1] = 1
     device: DeviceIdentity
-    management: ManagementAddress | XrManagementAddress | XeManagementAddress
+    management: ManagementAddress | XrManagementAddress | XeManagementAddress | EosManagementAddress
     software: SoftwareIntent | None = None
     ztp_enabled: Literal[True]
     initial_configuration: InitialConfiguration | None = None
 
     @model_validator(mode="after")
     def platform_contract(self):
-        if self.device.platform == "iosxr":
-            if not isinstance(self.management, XrManagementAddress) or self.software is not None:
-                raise ValueError("IOS XR supports default-VRF configuration only; omit software")
-        elif self.device.platform == "iosxe":
-            if not isinstance(self.management, XeManagementAddress) or self.software is not None:
-                raise ValueError("IOS XE supports default-VRF configuration only; omit software")
+        if self.device.platform in CONFIG_ONLY_MANAGEMENT:
+            if (
+                not isinstance(self.management, CONFIG_ONLY_MANAGEMENT[self.device.platform])
+                or self.software is not None
+            ):
+                label = CONFIG_ONLY_LABELS[self.device.platform][1]
+                raise ValueError(label + " supports default-VRF configuration only; omit software")
         elif self.device.platform == "nxos":
             if type(self.management) is not ManagementAddress or self.software is None:
                 raise ValueError("NX-OS requires mgmt0 and software intent")
@@ -218,11 +243,18 @@ class XeManifest(ConfigOnlyManifest):
     management: XeManagementAddress
 
 
+class EosManifest(ConfigOnlyManifest):
+    platform: Literal["eos"] = "eos"
+    management: EosManagementAddress
+
+
 def parse_manifest(value):
     if value.get("platform") == "iosxr":
         return XrManifest.model_validate(value)
     if value.get("platform") == "iosxe":
         return XeManifest.model_validate(value)
+    if value.get("platform") == "eos":
+        return EosManifest.model_validate(value)
     return Manifest.model_validate(value)
 
 
@@ -230,7 +262,7 @@ class RegistrationResponse(Contract):
     provisioning_id: str
     state: str = "AUTHORIZED"
     plan_hash: Digest
-    manifest: Manifest | XrManifest | XeManifest
+    manifest: Manifest | XrManifest | XeManifest | EosManifest
     status_token: str
     status_token_expires_at: int
 

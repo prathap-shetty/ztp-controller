@@ -42,11 +42,11 @@ def dhcp(mode):
         assert opts[53] == b"\x02"
         if mode == "secure-https":
             assert opts[43][:4] == bytes([1, 0, 1, 1]), opts[43].hex()
-            assert b"https://192.0.2.2/bootstrap/poap.py" in opts[43]
+            assert b"https://192.0.2.2/bootstrap/nxos.py" in opts[43]
             assert 66 not in opts and 67 not in opts
         else:
             assert opts[66] == (b"http://192.0.2.2" if mode == "legacy-http" else b"192.0.2.2")
-            assert opts[67] == (b"bootstrap/poap.py" if mode == "legacy-http" else b"poap.py")
+            assert opts[67] == (b"bootstrap/nxos.py" if mode == "legacy-http" else b"nxos.py")
         requested = bytes(packet[:240]) + bytes([53, 1, 3, 50, 4]) + response[16:20]
         requested += bytes([54, 4]) + opts[54] + bytes([255])
         channel.sendto(requested, ("192.0.2.2", 67))
@@ -58,7 +58,7 @@ def dhcp(mode):
 def tftp(server, expected):
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as channel:
         channel.settimeout(5)
-        channel.sendto(b"\x00\x01poap.py\x00octet\x00blksize\x001024\x00", (server, 69))
+        channel.sendto(b"\x00\x01nxos.py\x00octet\x00blksize\x001024\x00", (server, 69))
         response, peer = channel.recvfrom(4096)
         assert 40000 <= peer[1] <= 40100
         assert response[:2] == b"\x00\x06"  # negotiated block size

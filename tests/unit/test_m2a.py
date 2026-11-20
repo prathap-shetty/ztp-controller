@@ -14,7 +14,7 @@ from app.services.validation import SshValidator, configuration_matches
 from app.settings import Settings
 from app.vendors.cisco_nxos import CiscoNxosAdapter
 from scripts.kea_profiles import configuration, secure_options
-from scripts.release_bootstrap import release
+from scripts.release_nxos_bootstrap import release
 
 
 @pytest.fixture
@@ -87,7 +87,7 @@ def test_unqualified_and_wrong_version_fail(config_setup):
 
 
 def load_bootstrap():
-    spec = importlib.util.spec_from_file_location("bootstrap", "poap/cisco/poap.py")
+    spec = importlib.util.spec_from_file_location("bootstrap", "poap/cisco/nxos.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -144,8 +144,8 @@ def test_bootstrap_schedules_once_and_never_installs(config_setup, tmp_path):
 
 
 def test_release_embedded_checksum(tmp_path):
-    release(Path("poap/cisco/poap.py"), tmp_path, "https://192.0.2.2")
-    script = (tmp_path / "poap.py").read_bytes()
+    release(Path("poap/cisco/nxos.py"), tmp_path, "https://192.0.2.2")
+    script = (tmp_path / "nxos.py").read_bytes()
     without = b"".join(
         line for line in script.splitlines(keepends=True) if not line.startswith(b"#md5sum=")
     )
@@ -153,11 +153,11 @@ def test_release_embedded_checksum(tmp_path):
     assert b'CONTROLLER_URL = "https://192.0.2.2"' in script
     assert b"GENERATED_BY_RELEASE_TOOL" not in script
     with pytest.raises(ValueError):
-        release(Path("poap/cisco/poap.py"), tmp_path, "http://192.0.2.2")
+        release(Path("poap/cisco/nxos.py"), tmp_path, "http://192.0.2.2")
 
 
 def test_secure_dhcp_tlv_uses_two_byte_lengths():
-    data = bytes.fromhex(secure_options("https://192.0.2.2/bootstrap/poap.py").replace(":", ""))
+    data = bytes.fromhex(secure_options("https://192.0.2.2/bootstrap/nxos.py").replace(":", ""))
     assert data[:4] == bytes([1, 0, 1, 1])
     assert data[4] == 2
     assert int.from_bytes(data[5:7], "big") == len(data[7:])

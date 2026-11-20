@@ -42,7 +42,7 @@
           },
           {
             "name": "boot-file-name",
-            "data": "bootstrap/vlan200/poap.py",
+            "data": "bootstrap/vlan200/nxos.py",
             "always-send": true
           }
         ]
@@ -74,7 +74,7 @@
           },
           {
             "name": "boot-file-name",
-            "data": "bootstrap/vlan500/poap.py",
+            "data": "bootstrap/vlan500/nxos.py",
             "always-send": true
           }
         ]

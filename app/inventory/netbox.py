@@ -6,17 +6,14 @@ from pydantic import ValidationError
 from app.errors import InvalidIntent, InventoryDenied, InventoryUnavailable
 from app.inventory.base import InventoryProvider
 from app.models.contracts import (
+    CONFIG_ONLY_LABELS,
+    CONFIG_ONLY_MANAGEMENT,
     DeviceIdentity,
     DeviceIntent,
     InitialConfiguration,
     ManagementAddress,
     SoftwareIntent,
-    XeManagementAddress,
-    XrManagementAddress,
 )
-
-CONFIG_ONLY_MANAGEMENT = {"iosxr": XrManagementAddress, "iosxe": XeManagementAddress}
-CONFIG_ONLY_LABELS = {"iosxr": ("xr", "IOS XR"), "iosxe": ("xe", "IOS XE")}
 
 
 def identity(
@@ -24,10 +21,16 @@ def identity(
     platform_slug: str,
     xr_platform_slug: str = "cisco_iosxr",
     xe_platform_slug: str = "cisco_iosxe",
+    eos_platform_slug: str = "arista_eos",
 ) -> DeviceIdentity:
     if not record.get("platform"):
         raise InvalidIntent("platform_missing", "NetBox device has no platform assigned")
-    platforms = {xe_platform_slug: "iosxe", xr_platform_slug: "iosxr", platform_slug: "nxos"}
+    platforms = {
+        eos_platform_slug: "eos",
+        xe_platform_slug: "iosxe",
+        xr_platform_slug: "iosxr",
+        platform_slug: "nxos",
+    }
     if record["platform"].get("slug") not in platforms:
         raise InvalidIntent(
             "platform_mismatch", "NetBox platform does not match configured platform slug"
@@ -58,12 +61,14 @@ class NetBoxInventoryProvider(InventoryProvider):
         branch: str = "main",
         xr_platform_slug: str = "cisco_iosxr",
         xe_platform_slug: str = "cisco_iosxe",
+        eos_platform_slug: str = "arista_eos",
     ):
         self.base_url = base_url.rstrip("/") + "/api/"
         self.platform_slug = platform_slug
         self.xr_platform_slug = xr_platform_slug
         self.xe_platform_slug = xe_platform_slug
-        self.slugs = (platform_slug, xr_platform_slug, xe_platform_slug)
+        self.eos_platform_slug = eos_platform_slug
+        self.slugs = (platform_slug, xr_platform_slug, xe_platform_slug, eos_platform_slug)
         headers = {"Authorization": f"{auth_scheme} {token}", "Accept": "application/json"}
         if branch.strip() and branch.strip() != "main":
             headers["X-NetBox-Branch"] = branch.strip()
@@ -114,9 +119,7 @@ class NetBoxInventoryProvider(InventoryProvider):
             raise InventoryUnavailable()
         if len(records) != 1:
             raise InventoryDenied("serial_not_found", "Chassis serial was not found in inventory")
-        device = identity(
-            records[0], self.platform_slug, self.xr_platform_slug, self.xe_platform_slug
-        )
+        device = identity(records[0], *self.slugs)
         if device.serial_number != serial:
             raise InventoryDenied()
         return device

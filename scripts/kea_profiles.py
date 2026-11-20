@@ -30,7 +30,7 @@ def configuration(mode, interface="eth1", server="192.0.2.2"):
                 "name": "cisco-poap",
                 "csv-format": False,
                 "always-send": True,
-                "data": secure_options(f"https://{server}/bootstrap/poap.py", "192.0.2.1"),
+                "data": secure_options(f"https://{server}/bootstrap/nxos.py", "192.0.2.1"),
             }
         )
     else:
@@ -43,7 +43,7 @@ def configuration(mode, interface="eth1", server="192.0.2.2"):
                 },
                 {
                     "name": "boot-file-name",
-                    "data": ("bootstrap/poap.py" if mode == "legacy-http" else "poap.py"),
+                    "data": ("bootstrap/nxos.py" if mode == "legacy-http" else "nxos.py"),
                     "always-send": True,
                 },
             ]

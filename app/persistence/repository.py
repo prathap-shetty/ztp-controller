@@ -93,6 +93,7 @@ class Repository:
         config_body: str | None = None,
         validation_delay: int = 90,
         validation_deadline: int = 1800,
+        verify: bool = False,
     ) -> RegistrationResponse:
         plan = manifest.model_dump(mode="json")
         plan_hash = stable_hash(plan)
@@ -122,7 +123,11 @@ class Repository:
                         id=str(uuid.uuid4()), attempt_id=inserted, kind="AUTHORIZED", created_at=now
                     )
                 )
-            if inserted and config_body is not None and manifest.validation_policy == "ssh":
+            if (
+                inserted
+                and config_body is not None
+                and (manifest.validation_policy == "ssh" or verify)
+            ):
                 session.add(
                     ValidationJob(
                         attempt_id=inserted,

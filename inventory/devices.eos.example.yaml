@@ -1,0 +1,20 @@
+schema_version: 1
+devices:
+  - device:
+      id: lab-veos-01
+      name: lab-veos-01
+      # Use show version serial; for vEOS with an empty serial, the system MAC
+      # without separators, in upper case (for example 5254001A2B3C).
+      serial_number: REPLACE_WITH_SERIAL
+      vendor: arista
+      platform: eos
+      # The modelName from show version, in upper case.
+      model: VEOS-LAB
+      status: staged
+    ztp_enabled: false
+    management:
+      address: 10.10.10.120/24
+      gateway: 10.10.10.1
+      interface: Management1
+      vrf: default
+    # No software, image or target-version fields for Arista EOS.

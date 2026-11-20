@@ -122,7 +122,9 @@ class SshValidator:
 
 
 def validate_once(engine, inventory, validator, settings):
-    if settings.lite_mode or settings.execution_mode == "planning-only":
+    if settings.execution_mode == "planning-only" or (
+        settings.lite_mode and not settings.lite_verification
+    ):
         return False
     claim = claim_validation(engine, settings.validation_lease_seconds)
     if claim is None:
@@ -131,6 +133,9 @@ def validate_once(engine, inventory, validator, settings):
         result, evidence = "fatal", {"reason": "already_terminal"}
     elif int(time.time()) >= claim["deadline"]:
         result, evidence = "fatal", {"reason": "validation_deadline_exceeded"}
+    elif settings.lite_mode and claim["state"] == "AUTHORIZED":
+        # The device has not yet reported staging or applying configuration.
+        result, evidence = "retry", {"reason": "awaiting_device_report"}
     else:
         try:
             intent = inventory.get_device_intent(claim["intent"]["device"]["id"])

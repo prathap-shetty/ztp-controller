@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     xe_enabled: bool = False
     xe_platform_slug: str = "cisco_iosxe"
     xe_bootstrap_path: Path = Path("poap/cisco/iosxe.py")
+    eos_enabled: bool = False
+    eos_platform_slug: str = "arista_eos"
+    eos_bootstrap_path: Path = Path("poap/arista/eos.py")
     netbox_url: str = ""
     netbox_branch: str = "main"
     netbox_verify_ssl: bool = True
@@ -42,10 +45,12 @@ class Settings(BaseSettings):
     )
     allow_unqualified_lab: bool = False
     template_path: Path = Path("templates/cisco/nxos_initial.j2")
-    bootstrap_path: Path = Path("poap/cisco/poap.py")
+    bootstrap_path: Path = Path("poap/cisco/nxos.py")
     dashboard_token: SecretStr | None = None
     dashboard_secure_cookie: bool = True
     lite_mode: bool = False
+    # Opt-in Lite post-provisioning check: ping, SSH login, identity and configuration.
+    lite_verification: bool = False
     allow_newer_version: bool = False
     skip_source_validation: bool = False
     admin_password: SecretStr | None = None

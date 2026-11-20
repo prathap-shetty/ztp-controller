@@ -52,7 +52,7 @@ def test_dashboard_local_entries_and_invalid_inventory(settings, db, tmp_path):
     from app.inventory.local_yaml import LocalYamlInventoryProvider
 
     inventory = tmp_path / "devices.yaml"
-    inventory.write_text(Path("inventory/devices.example.yaml").read_text())
+    inventory.write_text(Path("inventory/devices.nxos.example.yaml").read_text())
     settings = settings.model_copy(
         update={
             "lite_mode": True,

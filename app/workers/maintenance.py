@@ -9,6 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.inventory.factory import build_provider
 from app.persistence.database import build_engine
 from app.persistence.repository import Repository
+from app.services.lite_verification import LiteSshValidator
 from app.services.validation import SshValidator, validate_once
 from app.settings import Settings
 
@@ -21,7 +22,7 @@ def main():
     settings = Settings()
     engine = build_engine(settings.database_url.get_secret_value())
     inventory = build_provider(settings)
-    validator = SshValidator(settings)
+    validator = LiteSshValidator(settings) if settings.lite_mode else SshValidator(settings)
     try:
         while not stopped.is_set():
             try:

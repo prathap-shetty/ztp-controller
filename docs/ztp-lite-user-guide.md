@@ -12,7 +12,7 @@ to your actual network before starting DHCP.
 cp .env.lite.example .env.lite
 chmod 600 .env.lite
 mkdir -p images inventory
-cp inventory/devices.example.yaml inventory/devices.yaml
+cp inventory/devices.nxos.example.yaml inventory/devices.yaml
 ```
 
 Set unique `POSTGRES_PASSWORD`, `ZTP_ADMIN_PASSWORD` and `ZTP_DASHBOARD_TOKEN` in
@@ -32,7 +32,7 @@ in the image directory and generate only the bootstrap:
 
 ```bash
 sha256sum images/nxos64-cs.10.5.4.M.bin
-python3 scripts/release_bootstrap.py --controller http://10.10.10.1 \
+python3 scripts/release_nxos_bootstrap.py --controller http://10.10.10.1 \
   --allow-http --output deploy/bootstrap
 ```
 
@@ -147,8 +147,8 @@ configuration naming a missing interface. Confirm there is no competing DHCP ser
 or relay on either VLAN.
 
 ```bash
-python3 scripts/release_bootstrap.py --controller http://10.20.0.1 --allow-http --output deploy/bootstrap/vlan200
-python3 scripts/release_bootstrap.py --controller http://10.50.0.1 --allow-http --output deploy/bootstrap/vlan500
+python3 scripts/release_nxos_bootstrap.py --controller http://10.20.0.1 --allow-http --output deploy/bootstrap/vlan200
+python3 scripts/release_nxos_bootstrap.py --controller http://10.50.0.1 --allow-http --output deploy/bootstrap/vlan500
 ```
 
 Set these in `.env.lite`:
@@ -167,12 +167,41 @@ curl http://10.20.0.1/ready
 curl http://10.50.0.1/ready
 ```
 
-Boot options are per subnet, so one VLAN can serve NX-OS and the other IOS XR or IOS XE.
-For XR or XE, generate with `scripts/release_xr_bootstrap.py` or
-`scripts/release_xe_bootstrap.py` and set `boot-file-name` to the full URL, for
-example `http://10.50.0.1/bootstrap/vlan500/iosxr.py`. Both VLANs share one
+Boot options are per subnet, so one VLAN can serve NX-OS and the other IOS XR, IOS XE
+or Arista EOS. For those, generate with `scripts/release_xr_bootstrap.py`,
+`scripts/release_xe_bootstrap.py` or `scripts/release_eos_bootstrap.py` and set
+`boot-file-name` to the full URL, for example
+`http://10.50.0.1/bootstrap/vlan500/iosxr.py`. Both VLANs share one
 inventory, database and dashboard. Do not bind Nginx to `0.0.0.0`: that exposes the
 controller and dashboard on every host interface.
+
+## Optional: several platforms on one subnet
+
+`examples/mixed-platform/kea.json` selects each device's script with Kea client
+classes matched on DHCP option 60 (vendor class) or 77 (user class). Generate every enabled platform's
+bootstrap into `deploy/bootstrap`, then set:
+
+```bash
+ZTP_KEA_CONFIG=./examples/mixed-platform/kea.json
+```
+
+| Class | Match | Option 67 |
+|---|---|---|
+| `ztp-eos` | option 60 starts with `Arista;` | `http://10.10.10.1/bootstrap/eos.py` |
+| `ztp-iosxe` | option 60 equals `ciscopnp` | `http://10.10.10.1/bootstrap/iosxe.py` |
+| `ztp-nxos` | option 77 user class `Cisco-POAP` | `bootstrap/nxos.py` with option 66 `http://10.10.10.1` |
+
+The values come from vEOS 4.30.7M, Catalyst 8000V 17.x and Nexus 9000v POAP
+captures. Option 77 uses RFC 3004 format, so the NX-OS test matches the length byte
+`0x0a` followed by `Cisco-POAP`. Only the NX-OS class sends option 66. Any other
+device that sends `ciscopnp`, such as a different IOS XE model, also receives the
+IOS XE script. A client matching no class gets an address but no boot options.
+IOS XR is not classified yet; add a class from its captured values. Check a
+client's values with:
+
+```bash
+sudo tcpdump -i ens3 -nn -vvv -s0 'udp port 67 or udp port 68'
+```
 
 ## 5. Provision and verify
 
@@ -189,7 +218,29 @@ path. Set the options to false when exact catalog policy is required.
 
 After boot, inspect `show version`, `show hostname`, `show interface mgmt0`,
 `show ip route vrf management` and `show startup-config`. Test gateway connectivity.
-The dashboard deliberately shows “Awaiting manual verification” after staging.
+The dashboard shows “Awaiting manual verification” after staging unless automatic
+verification below is enabled.
+
+### Optional: automatic verification
+
+Set `ZTP_LITE_VERIFICATION=true` in `.env.lite` and recreate the stack. The
+`ztp-worker` container then checks each new attempt after the device reports its
+configuration, retrying every 30 seconds until 30 minutes have passed:
+
+1. Ping the management address from the controller.
+2. SSH to it as `admin` with `ZTP_ADMIN_PASSWORD`. The first SSH host key seen is
+   pinned for the attempt; a different key later stops verification.
+3. Confirm the chassis serial and model, and for NX-OS the target version.
+4. Confirm the rendered configuration is in running and startup configuration
+   (committed configuration on IOS XR). Password and secret lines are skipped
+   because devices store hashes; the successful login checks the password.
+
+All checks passing marks the device **Verified**. The worker runs show commands
+only. A failure never marks the attempt failed: the dashboard shows the reason and
+missing configuration lines, and **Verify now** in the device row runs the checks
+again. Use **Verify now** for attempts made before enabling the setting. The
+controller host needs a route to each final management address. The first-use
+pin trusts whichever device answers first, so use an isolated network.
 
 ## 6. Reprovision after an erase
 
@@ -226,8 +277,15 @@ served bootstrap after script updates:
 
 ```bash
 docker compose --env-file .env.lite -f compose.lite.yaml up -d --build ztp-api nginx
-python3 scripts/release_bootstrap.py --controller http://10.10.10.1 --allow-http --output deploy/bootstrap
+python3 scripts/release_nxos_bootstrap.py --controller http://10.10.10.1 --allow-http --output deploy/bootstrap
 ```
+
+The NX-OS bootstrap is served as `nxos.py` and generated by
+`scripts/release_nxos_bootstrap.py`; earlier releases served `poap.py` and used
+`scripts/release_bootstrap.py`. When upgrading, point Kea `boot-file-name` at `bootstrap/nxos.py` (or your
+VLAN path) and recreate Kea. A previously generated `deploy/bootstrap/poap.py` is not
+removed or updated automatically; delete it after the switch-over so DHCP cannot
+keep serving the stale script.
 
 Recent failures shows the latest 100 rejected registrations, with storage capped
 at 1,000 records. It includes missing platforms, malformed checksums, inventory
