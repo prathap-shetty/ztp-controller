@@ -209,3 +209,42 @@ def test_netbox_eos_without_image(records, netbox):
     device["config_context"]["ztp"]["image"] = {}
     with pytest.raises(ZtpError, match="Arista EOS does not accept software intent"):
         netbox[0].get_device_intent("1")
+
+
+def test_eos_registration_retries_only_unreachable_controller(monkeypatch):
+    module = load_bootstrap()
+    calls = []
+
+    def flaky(path, data=None, token=None, limit=None):
+        calls.append(path)
+        if len(calls) < 3:
+            raise module.ControllerUnreachable("Controller unreachable: [Errno 111] refused")
+        return b'{"ok": true}'
+
+    monkeypatch.setattr(module, "request", flaky)
+    monkeypatch.setattr(module.time, "sleep", lambda _: None)
+    assert module.register({}) == {"ok": True} and len(calls) == 3
+
+    def rejected(path, data=None, token=None, limit=None):
+        calls.append(path)
+        raise module.BootstrapError("Controller rejected request: HTTP 403")
+
+    calls.clear()
+    monkeypatch.setattr(module, "request", rejected)
+    with pytest.raises(module.BootstrapError, match="HTTP 403"):
+        module.register({})
+    assert len(calls) == 1
+
+
+def test_eos_request_reports_connection_failure_reason(monkeypatch):
+    module = load_bootstrap()
+    monkeypatch.setattr(module, "CONTROLLER_URL", "http://192.0.2.1")
+    monkeypatch.setattr(module, "ALLOW_HTTP", True)
+
+    class Opener:
+        def open(self, req, timeout):
+            raise module.URLError(ConnectionRefusedError(111, "Connection refused"))
+
+    monkeypatch.setattr(module, "build_opener", lambda *handlers: Opener())
+    with pytest.raises(module.ControllerUnreachable, match="Connection refused"):
+        module.request("/api/v1/ztp/register", {})
