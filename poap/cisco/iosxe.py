@@ -8,7 +8,7 @@ import re
 import sys
 import time
 import uuid
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 CONTROLLER_URL = "https://controller.example.invalid"
@@ -25,6 +25,10 @@ class BootstrapError(Exception):
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise BootstrapError("Controller redirects are not supported")
+
+
+class ControllerUnreachable(BootstrapError):
+    """No HTTP response: refused, unroutable or timed out. Safe to retry."""
 
 
 def request(path, data=None, token=None, limit=1048576):
@@ -44,6 +48,9 @@ def request(path, data=None, token=None, limit=1048576):
     except HTTPError as exc:
         # Never print response bodies: inventory and credentials may be present.
         raise BootstrapError("Controller rejected request: HTTP " + str(exc.code)) from None
+    except URLError as exc:
+        # The reason is a local socket error such as "Network is unreachable".
+        raise ControllerUnreachable("Controller unreachable: " + str(exc.reason)) from None
 
 
 def command(cli, text):
@@ -144,8 +151,20 @@ def save(cli):
         return False
 
 
+def register(observed):
+    # Guest Shell networking can lag its start. Registration returns the same
+    # attempt when repeated, so only a missing HTTP response is retried.
+    for attempt in range(6):
+        try:
+            return json.loads(request("/api/v1/ztp/register", observed).decode())
+        except ControllerUnreachable:
+            if attempt == 5:
+                raise
+            time.sleep(10)
+
+
 def apply(cli, observed, interface):
-    registration = json.loads(request("/api/v1/ztp/register", observed).decode())
+    registration = register(observed)
     manifest = registration["manifest"]
     attempt_id = str(uuid.UUID(registration["provisioning_id"]))
     if (
