@@ -9,7 +9,7 @@ import subprocess
 import sys
 import time
 import uuid
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 CONTROLLER_URL = "https://controller.example.invalid"
@@ -31,6 +31,10 @@ class NoRedirect(HTTPRedirectHandler):
         raise BootstrapError("Controller redirects are not supported")
 
 
+class ControllerUnreachable(BootstrapError):
+    """No HTTP response: refused, unroutable or timed out. Safe to retry."""
+
+
 def request(path, data=None, token=None, limit=1048576):
     if CONTROLLER_URL.startswith("http://") and not ALLOW_HTTP:
         raise BootstrapError("HTTP controller requires explicit opt-in")
@@ -48,6 +52,9 @@ def request(path, data=None, token=None, limit=1048576):
     except HTTPError as exc:
         # Never print response bodies: inventory and credentials may be present.
         raise BootstrapError("Controller rejected request: HTTP " + str(exc.code)) from None
+    except URLError as exc:
+        # The reason is a local socket error such as "Connection refused".
+        raise ControllerUnreachable("Controller unreachable: " + str(exc.reason)) from None
 
 
 def show(command):
@@ -143,8 +150,20 @@ def stage(config):
     return True
 
 
+def register(observed):
+    # Registration returns the same attempt when repeated, so a lost connection
+    # shortly after the DHCP lease is retried instead of failing the ZTP run.
+    for attempt in range(5):
+        try:
+            return json.loads(request("/api/v1/ztp/register", observed).decode())
+        except ControllerUnreachable:
+            if attempt == 4:
+                raise
+            time.sleep(5)
+
+
 def apply(observed, interface):
-    registration = json.loads(request("/api/v1/ztp/register", observed).decode())
+    registration = register(observed)
     manifest = registration["manifest"]
     attempt_id = str(uuid.UUID(registration["provisioning_id"]))
     if (
