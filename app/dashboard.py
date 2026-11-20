@@ -37,6 +37,9 @@ def dashboard_data(request: Request):
         failures = [
             {
                 "serial": f.serial,
+                "vendor": f.vendor,
+                "platform": f.platform,
+                "model": f.model,
                 "stage": f.stage,
                 "code": f.code,
                 "message": f.message,

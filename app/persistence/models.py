@@ -68,3 +68,7 @@ class RegistrationFailure(Base):
     code: Mapped[str] = mapped_column(String(64))
     message: Mapped[str] = mapped_column(String(256))
     created_at: Mapped[int] = mapped_column(BigInteger, index=True)
+    # Device-reported, schema-validated identity; never inventory data.
+    vendor: Mapped[str | None] = mapped_column(String(128))
+    platform: Mapped[str | None] = mapped_column(String(128))
+    model: Mapped[str | None] = mapped_column(String(128))
