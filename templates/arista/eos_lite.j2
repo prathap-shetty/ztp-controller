@@ -1,0 +1,13 @@
+! Arista EOS
+hostname {{ hostname }}
+username admin privilege 15 role network-admin secret 0 {{ password }}
+!
+interface {{ management.interface }}
+   ip address {{ management.address }}
+!
+ip route 0.0.0.0/0 {{ management.gateway }}
+!
+management ssh
+   no shutdown
+!
+end

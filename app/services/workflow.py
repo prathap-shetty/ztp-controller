@@ -85,6 +85,7 @@ def claim_validation(engine, lease_seconds: int):
             "observed": attempt.observed,
             "manifest": attempt.manifest,
             "config_body": attempt.config_body,
+            "evidence": job.evidence,
         }
         return payload
 
@@ -101,6 +102,11 @@ def finish_validation(engine, claim, result: str, evidence: dict, settings):
         )
         if job.lease_id != claim["lease_id"] or job.lease_until <= now:
             return False  # stale worker must not overwrite a newer lease
+        previous = job.evidence or {}
+        if "host_keys" in previous and "host_keys" not in evidence:
+            # Keep the first-use host key pin across failed or early checks.
+            evidence = {**evidence, "host_keys": previous["host_keys"]}
+            evidence.setdefault("host_key", previous.get("host_key"))
         if attempt.state in {"FAILED", "VALIDATED"}:
             job.done = True
         elif result == "valid":
@@ -111,10 +117,18 @@ def finish_validation(engine, claim, result: str, evidence: dict, settings):
             or now >= job.deadline
             or job.attempts >= settings.validation_max_attempts
         ):
-            attempt.state, attempt.failure_reason, job.done = "FAILED", evidence["reason"], True
-            add_event(session, attempt, "FAILED")
+            job.done = True
+            if settings.lite_mode:
+                # Lite verification observes only; the operator can retry it.
+                if attempt.state == "VALIDATING":
+                    attempt.state = "CONFIGURING"
+                add_event(session, attempt, "VERIFICATION_FAILED")
+            else:
+                attempt.state, attempt.failure_reason = "FAILED", evidence["reason"]
+                add_event(session, attempt, "FAILED")
         else:
-            attempt.state = "VALIDATING"
+            if not settings.lite_mode or attempt.state == "CONFIGURING":
+                attempt.state = "VALIDATING"
             job.available_at = now + settings.validation_retry_seconds
         job.evidence = evidence
         job.lease_id, job.lease_until = None, 0

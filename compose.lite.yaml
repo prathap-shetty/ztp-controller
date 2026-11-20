@@ -30,6 +30,8 @@ services:
       ZTP_XR_PLATFORM_SLUG: ${ZTP_XR_PLATFORM_SLUG:-cisco_iosxr}
       ZTP_XE_ENABLED: ${ZTP_XE_ENABLED:-false}
       ZTP_XE_PLATFORM_SLUG: ${ZTP_XE_PLATFORM_SLUG:-cisco_iosxe}
+      ZTP_EOS_ENABLED: ${ZTP_EOS_ENABLED:-false}
+      ZTP_EOS_PLATFORM_SLUG: ${ZTP_EOS_PLATFORM_SLUG:-arista_eos}
       ZTP_INVENTORY_PROVIDER: ${ZTP_INVENTORY_PROVIDER:-local-yaml}
       ZTP_INFRAHUB_URL: ${ZTP_INFRAHUB_URL:-http://host.docker.internal:8000}
       ZTP_INFRAHUB_TOKEN: ${ZTP_INFRAHUB_TOKEN:-}
@@ -59,6 +61,7 @@ services:
       ZTP_DASHBOARD_TOKEN: ${ZTP_DASHBOARD_TOKEN:-}
       ZTP_DASHBOARD_SECURE_COOKIE: 'false'
       ZTP_LITE_MODE: 'true'
+      ZTP_LITE_VERIFICATION: ${ZTP_LITE_VERIFICATION:-false}
       ZTP_SKIP_SOURCE_VALIDATION: ${ZTP_SKIP_SOURCE_VALIDATION:-true}
       ZTP_ADMIN_PASSWORD: ${ZTP_ADMIN_PASSWORD:?Set ZTP_ADMIN_PASSWORD}
       ZTP_NETBOX_TOKEN: ${ZTP_NETBOX_TOKEN:-}
@@ -90,13 +93,15 @@ services:
     restart: 'no'
   ztp-api:
     build: *id001
-    environment:
+    environment: &api-environment
       ZTP_DATABASE_URL: postgresql+psycopg://ztp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD
         in .env}@postgres:5432/ztp
       ZTP_XR_ENABLED: ${ZTP_XR_ENABLED:-false}
       ZTP_XR_PLATFORM_SLUG: ${ZTP_XR_PLATFORM_SLUG:-cisco_iosxr}
       ZTP_XE_ENABLED: ${ZTP_XE_ENABLED:-false}
       ZTP_XE_PLATFORM_SLUG: ${ZTP_XE_PLATFORM_SLUG:-cisco_iosxe}
+      ZTP_EOS_ENABLED: ${ZTP_EOS_ENABLED:-false}
+      ZTP_EOS_PLATFORM_SLUG: ${ZTP_EOS_PLATFORM_SLUG:-arista_eos}
       ZTP_INVENTORY_PROVIDER: ${ZTP_INVENTORY_PROVIDER:-local-yaml}
       ZTP_INFRAHUB_URL: ${ZTP_INFRAHUB_URL:-http://host.docker.internal:8000}
       ZTP_INFRAHUB_TOKEN: ${ZTP_INFRAHUB_TOKEN:-}
@@ -126,10 +131,11 @@ services:
       ZTP_DASHBOARD_TOKEN: ${ZTP_DASHBOARD_TOKEN:-}
       ZTP_DASHBOARD_SECURE_COOKIE: 'false'
       ZTP_LITE_MODE: 'true'
+      ZTP_LITE_VERIFICATION: ${ZTP_LITE_VERIFICATION:-false}
       ZTP_SKIP_SOURCE_VALIDATION: ${ZTP_SKIP_SOURCE_VALIDATION:-true}
       ZTP_ADMIN_PASSWORD: ${ZTP_ADMIN_PASSWORD:?Set ZTP_ADMIN_PASSWORD}
       ZTP_NETBOX_TOKEN: ${ZTP_NETBOX_TOKEN:-}
-    volumes:
+    volumes: &api-volumes
     - ${ZTP_LOCAL_INVENTORY_DIR:-./inventory}:/run/ztp-inventory:ro
     - type: bind
       source: ${ZTP_CATALOG_FILE:-./catalog}
@@ -158,6 +164,27 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+  ztp-worker:
+    # Grant cleanup and opt-in Lite verification (ping and read-only SSH show commands).
+    build: *id001
+    environment: *api-environment
+    volumes: *api-volumes
+    command:
+    - python
+    - -m
+    - app.workers.maintenance
+    networks: *id002
+    security_opt: *id003
+    cap_drop: *id004
+    read_only: true
+    tmpfs: *id005
+    # Unprivileged ICMP echo for the ping check; no capability is added.
+    sysctls:
+      net.ipv4.ping_group_range: 0 2147483647
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
   nginx:
     image: nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236

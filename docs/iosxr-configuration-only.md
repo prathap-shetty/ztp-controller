@@ -109,7 +109,7 @@ python3 scripts/release_xr_bootstrap.py \
 docker compose --env-file .env.lite -f compose.lite.yaml up -d --build ztp-api nginx
 ```
 
-This creates `deploy/bootstrap/iosxr.py` without replacing the NX-OS `poap.py`.
+This creates `deploy/bootstrap/iosxr.py` without replacing the NX-OS `nxos.py`.
 Adjust the output to match `ZTP_BOOTSTRAP_DIR` if you use a different bind mount.
 
 ## 3. Select the XR script in DHCP

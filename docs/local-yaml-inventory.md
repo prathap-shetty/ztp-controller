@@ -1,6 +1,6 @@
 # Local YAML inventory
 
-Copy `inventory/devices.example.yaml` to `inventory/devices.yaml`, then configure
+Copy `inventory/devices.nxos.example.yaml` to `inventory/devices.yaml`, then configure
 real device IDs, serials, model names, final management addresses and matching
 image metadata. Set `ztp_enabled: true` for eligible staged devices only.
 

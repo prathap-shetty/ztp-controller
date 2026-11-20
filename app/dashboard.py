@@ -1,5 +1,6 @@
 """Authenticated operator dashboard."""
 
+import time
 from pathlib import Path
 from uuid import UUID
 
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.dashboard_auth import authenticated, login_page, require_dashboard
 from app.errors import ZtpError
 from app.inventory.local_yaml import LocalYamlInventoryProvider
-from app.persistence.models import Attempt, AttemptEvent, RegistrationFailure
+from app.persistence.models import Attempt, AttemptEvent, RegistrationFailure, ValidationJob
 from app.reprovision import prepare_reprovision
 
 router = APIRouter()
@@ -55,6 +56,12 @@ def dashboard_data(request: Request):
             .where(AttemptEvent.attempt_id.in_([a.id for a in attempts]))
             .order_by(AttemptEvent.created_at, AttemptEvent.id)
         ).all()
+        jobs = {
+            job.attempt_id: job
+            for job in session.scalars(
+                select(ValidationJob).where(ValidationJob.attempt_id.in_([a.id for a in attempts]))
+            )
+        }
         grouped = {}
         for event in events:
             grouped.setdefault(event.attempt_id, []).append(
@@ -83,6 +90,7 @@ def dashboard_data(request: Request):
                     "validation": a.manifest.get("validation_policy", "ssh"),
                     "upgrade_required": a.manifest["upgrade_required"],
                     "events": grouped.get(a.id, []),
+                    "verification": verification_summary(jobs.get(a.id)),
                 }
             )
     inventory, inventory_error = [], None
@@ -105,6 +113,7 @@ def dashboard_data(request: Request):
             inventory_error = "Local inventory could not be loaded. Check its path and YAML format."
     return {
         "can_reprovision": state.config.lite_mode,
+        "can_verify": state.config.lite_mode and state.config.lite_verification,
         "provider": state.config.inventory_provider,
         "mode": state.config.execution_mode,
         "attempts": rows,
@@ -113,6 +122,66 @@ def dashboard_data(request: Request):
         "inventory_error": inventory_error,
         "limit": 500,
     }
+
+
+def verification_summary(job):
+    if job is None:
+        return None
+    evidence = job.evidence or {}
+    # Allowlist: show-command output and configuration bodies are never returned.
+    return {
+        "done": job.done,
+        "running": job.lease_until > int(time.time()),
+        "attempts": job.attempts,
+        "next_at": None if job.done else job.available_at,
+        "reason": evidence.get("reason"),
+        "checked_at": evidence.get("checked_at"),
+        "checks": evidence.get("checks"),
+        "host_key": evidence.get("host_key"),
+        "missing_lines": evidence.get("missing_lines") or [],
+    }
+
+
+@router.post("/api/dashboard/attempts/{attempt_id}/verify")
+def verify_attempt(attempt_id: UUID, request: Request):
+    require_dashboard(request)
+    config = request.app.state.config
+    if not (config.lite_mode and config.lite_verification):
+        raise HTTPException(403, "Enable ZTP_LITE_VERIFICATION to verify devices")
+    if request.headers.get("X-ZTP-Action") != "verify":
+        raise HTTPException(403, "Dashboard action header required")
+    now = int(time.time())
+    with Session(request.app.state.db) as session, session.begin():
+        attempt = session.scalar(
+            select(Attempt).where(Attempt.id == str(attempt_id)).with_for_update()
+        )
+        if attempt is None or attempt.failure_reason == "operator_reprovision":
+            raise HTTPException(404, "Attempt not found")
+        if attempt.state == "VALIDATED":
+            raise HTTPException(409, "Device is already verified")
+        if attempt.state not in {"CONFIGURING", "VALIDATING"} or attempt.config_body is None:
+            raise HTTPException(409, "Device has not reported configuration yet")
+        job = session.scalar(
+            select(ValidationJob).where(ValidationJob.attempt_id == attempt.id).with_for_update()
+        )
+        if job is None:
+            session.add(
+                ValidationJob(
+                    attempt_id=attempt.id,
+                    available_at=now,
+                    deadline=now + config.validation_deadline_seconds,
+                    attempts=0,
+                    lease_until=0,
+                    done=False,
+                )
+            )
+        elif job.lease_until > now:
+            raise HTTPException(409, "Verification is already running")
+        else:
+            # Restart the bounded retry budget; any pinned host key is kept.
+            job.done, job.available_at, job.attempts = False, now, 0
+            job.deadline = now + config.validation_deadline_seconds
+    return {"message": "Verification queued. The worker checks ping, SSH, identity and config."}
 
 
 class ReprovisionRequest(BaseModel):

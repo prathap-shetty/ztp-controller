@@ -1,17 +1,18 @@
 # ZTP Lite
 
 A lightweight Linux controller for Cisco NX-OS power-on provisioning, with opt-in
-IOS XR and IOS XE configuration-only lab support. It supports
+IOS XR, IOS XE and Arista EOS configuration-only lab support. It supports
 NetBox, InfraHub or local YAML inventory, approved image delivery and installation,
 configuration staging, explicit reprovisioning, and a token-protected dashboard
 with registration failure diagnostics.
 
 **This branch contains the Linux Lite deployment only.** It uses HTTP, switch
-password authentication and manual post-boot verification. It disables NetBox TLS
-verification and SSH host-key validation. A dashboard token does not encrypt
+password authentication and manual post-boot verification by default; opt-in
+`ZTP_LITE_VERIFICATION` adds ping and SSH checks with a host key pinned on first use.
+It disables NetBox TLS verification. A dashboard token does not encrypt
 traffic. Run it on a controlled provisioning network; it is not a hardened
-production deployment. IOS XR and IOS XE support is configuration-only and awaits
-XRv9000 and Catalyst 8000V runtime qualification.
+production deployment. IOS XR, IOS XE and Arista EOS support is configuration-only
+and awaits XRv9000, Catalyst 8000V and vEOS runtime qualification.
 
 ## Start here
 
@@ -47,3 +48,4 @@ Third-party dependencies and vendor firmware retain their respective licenses.
 
 For XRv9000 configuration-only testing, see the [IOS XR guide](docs/iosxr-configuration-only.md).
 For Catalyst 8000V, see the [IOS XE guide](docs/iosxe-configuration-only.md).
+For vEOS, see the [Arista EOS guide](docs/eos-configuration-only.md).

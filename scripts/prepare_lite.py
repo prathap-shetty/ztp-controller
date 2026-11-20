@@ -6,7 +6,7 @@ import json
 import re
 from pathlib import Path
 
-from release_bootstrap import release
+from release_nxos_bootstrap import release
 
 
 def main():
@@ -53,7 +53,7 @@ def main():
     with args.catalog.open("x") as handle:
         json.dump(profiles, handle, indent=2)
         handle.write("\n")
-    release(Path("poap/cisco/poap.py"), args.bootstrap, args.controller, allow_http=True)
+    release(Path("poap/cisco/nxos.py"), args.bootstrap, args.controller, allow_http=True)
     print(
         "ZTP Lite catalog and HTTP bootstrap prepared for the specified model/source combinations."
     )

@@ -41,7 +41,7 @@
           },
           {
             "name": "boot-file-name",
-            "data": "bootstrap/poap.py",
+            "data": "bootstrap/nxos.py",
             "always-send": true
           }
         ]

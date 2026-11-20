@@ -5,7 +5,12 @@ from pydantic import ValidationError
 
 from app.errors import InvalidIntent, InventoryDenied, InventoryUnavailable
 from app.inventory.base import InventoryProvider
-from app.models.contracts import CONFIG_ONLY_PLATFORMS, DeviceIdentity, DeviceIntent
+from app.models.contracts import (
+    CONFIG_ONLY_LABELS,
+    CONFIG_ONLY_PLATFORMS,
+    DeviceIdentity,
+    DeviceIntent,
+)
 
 IDENTITY = """id name { value } serial { value } status { value }
 platform { node { name { value } } }
@@ -38,11 +43,18 @@ class InfraHubInventoryProvider(InventoryProvider):
         transport=None,
         xr_platform="cisco_iosxr",
         xe_platform="cisco_iosxe",
+        eos_platform="arista_eos",
     ):
         self.platform = platform
         self.xr_platform = xr_platform
         self.xe_platform = xe_platform
-        self.platforms = {xe_platform: "iosxe", xr_platform: "iosxr", platform: "nxos"}
+        self.eos_platform = eos_platform
+        self.platforms = {
+            eos_platform: "eos",
+            xe_platform: "iosxe",
+            xr_platform: "iosxr",
+            platform: "nxos",
+        }
         self.endpoint = url.rstrip("/") + "/graphql/" + branch
         self.client = httpx.Client(
             headers={"X-INFRAHUB-KEY": token},
@@ -146,7 +158,7 @@ class InfraHubInventoryProvider(InventoryProvider):
                 value(node, key)
                 for key in ("ztp_target_version", "ztp_image_name", "ztp_image_sha256")
             ):
-                code, label = ("xr", "IOS XR") if identity.platform == "iosxr" else ("xe", "IOS XE")
+                code, label = CONFIG_ONLY_LABELS[identity.platform]
                 raise InvalidIntent(
                     code + "_configuration_only", label + " does not accept software intent"
                 )

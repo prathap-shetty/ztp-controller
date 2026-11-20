@@ -32,3 +32,10 @@ def test_multi_vlan_override_requires_an_explicit_second_address():
 
     assert "${ZTP_BIND_ADDRESS_2:?" in override
     assert "0.0.0.0" not in override
+
+
+def test_nxos_kea_example_matches_the_default_lite_scope():
+    example = json.loads((ROOT / "examples/nxos/kea.json").read_text())
+    assert example == json.loads((ROOT / "deploy/lite/kea.json").read_text())
+    options = {o["name"]: o["data"] for o in example["Dhcp4"]["subnet4"][0]["option-data"]}
+    assert options["boot-file-name"] == "bootstrap/nxos.py"

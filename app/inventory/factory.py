@@ -22,6 +22,7 @@ def build_provider(settings: Settings) -> InventoryProvider:
             settings.infrahub_verify_ssl,
             xr_platform=settings.xr_platform_slug,
             xe_platform=settings.xe_platform_slug,
+            eos_platform=settings.eos_platform_slug,
         )
     if settings.inventory_provider == "local-yaml":
         return LocalYamlInventoryProvider(settings.local_inventory_path)
@@ -34,4 +35,5 @@ def build_provider(settings: Settings) -> InventoryProvider:
         branch=settings.netbox_branch,
         xr_platform_slug=settings.xr_platform_slug,
         xe_platform_slug=settings.xe_platform_slug,
+        eos_platform_slug=settings.eos_platform_slug,
     )

@@ -31,12 +31,12 @@ def release(source: Path, output: Path, controller: str, allow_http=False, ca_pe
     without = "".join(
         line for line in script.splitlines(keepends=True) if not line.startswith("#md5sum=")
     )
-    md5 = hashlib.md5(without.encode(), usedforsecurity=False).hexdigest()
+    md5 = hashlib.md5(without.encode()).hexdigest()
     script = script.replace('#md5sum="GENERATED_BY_RELEASE_TOOL"', '#md5sum="' + md5 + '"')
-    compile(script, "poap.py", "exec")
+    compile(script, "nxos.py", "exec")
     output.mkdir(parents=True, exist_ok=True)
-    (output / "poap.py").write_text(script)
-    (output / "poap.py.sha256").write_text(hashlib.sha256(script.encode()).hexdigest() + "\n")
+    (output / "nxos.py").write_text(script)
+    (output / "nxos.py.sha256").write_text(hashlib.sha256(script.encode()).hexdigest() + "\n")
 
 
 if __name__ == "__main__":
@@ -47,7 +47,7 @@ if __name__ == "__main__":
     parser.add_argument("--ca", type=Path)
     args = parser.parse_args()
     release(
-        Path("poap/cisco/poap.py"),
+        Path("poap/cisco/nxos.py"),
         args.output,
         args.controller,
         args.allow_http,

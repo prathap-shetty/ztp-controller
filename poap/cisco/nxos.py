@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # md5sum="GENERATED_BY_RELEASE_TOOL"
-"""Configuration-only NX-OS POAP. Release with scripts/release_bootstrap.py.
+"""Configuration-only NX-OS POAP. Release with scripts/release_nxos_bootstrap.py.
 
 Original implementation; native scheduled-config lifecycle referenced in UPSTREAM.md.
 Requires Python 3, cisco.vrf.set_global_vrf, CLI JSON and qualified replay behavior.

@@ -4,4 +4,7 @@
 `deploy/lite/kea.json`, selected with `ZTP_KEA_CONFIG`. Review its interface, subnet,
 pool and options before enabling the Compose `dhcp` profile. No TFTP service is
 included in this branch. For two management VLANs, start from
-`examples/multi-vlan/kea.json`; see the user guide.
+`examples/multi-vlan/kea.json`; see the user guide. Per-platform single-scope
+examples are in `examples/nxos/`, `examples/iosxr/`, `examples/iosxe/` and `examples/eos/`;
+`examples/nxos/kea.json` matches this default. `examples/mixed-platform/kea.json`
+selects the script per platform on one subnet with client classes.

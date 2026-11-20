@@ -22,13 +22,18 @@ from app.services.images import open_image
 from app.services.rendering import configuration_manifest
 from app.services.workflow import device_event
 from app.settings import Settings
+from app.vendors.arista_eos import AristaEosAdapter
 from app.vendors.cisco_iosxe import CiscoIosxeAdapter
 from app.vendors.cisco_iosxr import CiscoIosxrAdapter
 from app.vendors.cisco_nxos import CiscoNxosAdapter
 from app.vendors.netbox_nxos import NetBoxNxosAdapter
 
 bearer = HTTPBearer(auto_error=False)
-CONFIG_ONLY_ADAPTERS = {"iosxr": CiscoIosxrAdapter, "iosxe": CiscoIosxeAdapter}
+CONFIG_ONLY_ADAPTERS = {
+    "iosxr": CiscoIosxrAdapter,
+    "iosxe": CiscoIosxeAdapter,
+    "eos": AristaEosAdapter,
+}
 
 
 def create_app(settings: Settings | None = None, provider=None, engine=None) -> FastAPI:
@@ -147,6 +152,7 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
                 state.config.upgrade_deadline_seconds
                 if manifest.upgrade_required
                 else state.config.validation_deadline_seconds,
+                verify=state.config.lite_mode and state.config.lite_verification,
             )
         except ZtpError as exc:
             state.repository.record_registration_failure(observed.serial_number, stage, exc)

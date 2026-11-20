@@ -4,9 +4,9 @@
 
 This repository currently packages **ZTP Lite**, a Linux Docker Compose controller
 for Cisco NX-OS POAP, image installation and configuration staging, plus opt-in
-IOS XR and IOS XE configuration-only lab support. XRv9000 and Catalyst 8000V runtime
-qualification is pending. See `docs/iosxr-configuration-only.md` and
-`docs/iosxe-configuration-only.md`; broader adapter generalization remains in
+IOS XR, IOS XE and Arista EOS configuration-only lab support. XRv9000, Catalyst
+8000V and vEOS runtime qualification is pending. See `docs/iosxr-configuration-only.md`,
+`docs/iosxe-configuration-only.md` and `docs/eos-configuration-only.md`; broader adapter generalization remains in
 `docs/multivendor-implementation-plan.md`.
 
 - `main` contains the Lite-only deployment, MIT license and dashboard reset support.
@@ -33,8 +33,9 @@ qualification is pending. See `docs/iosxr-configuration-only.md` and
 - `app/vendors/cisco_nxos.py`, `nxos_version.py`: catalog and release policy.
 - `app/services/rendering.py`, `templates/cisco/`: configuration rendering.
 - `app/persistence/`, `migrations/`: durable attempts, grants, events and failures.
-- `poap/cisco/poap.py`: switch bootstrap; `scripts/release_bootstrap.py` generates
-  the served script with its checksum. Regenerate it after bootstrap changes.
+- `poap/cisco/nxos.py`: NX-OS POAP bootstrap, served as `nxos.py`;
+  `scripts/release_nxos_bootstrap.py` generates it with its checksum. Regenerate it
+  after bootstrap changes.
 - `app/dashboard.py`, `dashboard.html`, `dashboard_auth.py`: dashboard and login.
 - `app/reprovision.py`: shared controller reset operation and operator CLI.
 
@@ -55,9 +56,14 @@ qualification is pending. See `docs/iosxr-configuration-only.md` and
   action-header checks and stale-attempt protection on the reset endpoint.
 - Dashboard login uses a static environment token and an authenticated cookie.
   Do not expose raw tokens, passwords, configurations or inventory error bodies.
-- Lite uses HTTP/password login and manual post-boot verification. Configuration
+- Lite uses HTTP/password login and manual post-boot verification by default. Configuration
   staged does not mean the device rebooted successfully or was independently
   verified. Do not label it verified without evidence.
+- Opt-in `ZTP_LITE_VERIFICATION=true` runs `ztp-worker` (`app/services/lite_verification.py`):
+  ping, SSH as `admin` with the Lite password, chassis identity and rendered config in
+  running/startup config (secret lines skipped). Show commands only. The first SSH host
+  key per attempt is pinned in job evidence. Lite failures never set FAILED; they return
+  to CONFIGURING with VERIFICATION_FAILED and can be retried from the dashboard.
 - Equal/newer supported numeric NX-OS releases can skip installation under policy;
   `10.5(4)` and `10.5(4)M` are equivalent. Unknown suffixes must not be guessed.
 - Source validation bypass does not qualify an upgrade path. Preserve image
@@ -116,7 +122,7 @@ instruction to resume. Never embed lab credentials in this file.
   profiles; schema-v1 NX-OS attempts remain unchanged. Never send XR to NX-OS install
   or version-comparison code. No database schema migration is needed for these JSON plans.
 - `poap/cisco/iosxr.py` requires Python 3 and Cisco ZtpHelpers. Generate it with
-  `scripts/release_xr_bootstrap.py`; this must not replace NX-OS `poap.py`.
+  `scripts/release_xr_bootstrap.py`; this must not replace NX-OS `nxos.py`.
 - XR CONFIG_APPLYING and CONFIG_COMMITTED are device reports, not independent
   verification. Management-IP changes may interrupt the callback. Keep the durable
   pending/committed checkpoint and never blindly repeat an uncertain apply.
@@ -126,9 +132,9 @@ instruction to resume. Never embed lab credentials in this file.
 
 - Enable with `ZTP_XE_ENABLED=true` in Lite; `cisco_iosxe` is the default external
   label and `iosxe` the canonical identity. XR and XE enablement are independent.
-- `app/vendors/config_only.py` is shared by the XR and XE adapters; both emit
-  schema-v2 apply-config plans. `CONFIG_ONLY_PLATFORMS` in contracts lists them.
-  Never send either to NX-OS install or version-comparison code.
+- `app/vendors/config_only.py` is shared by the XR, XE and EOS adapters; all emit
+  schema-v2 apply-config plans. `CONFIG_ONLY_LABELS` in contracts lists them.
+  Never send any of them to NX-OS install or version-comparison code.
 - XE management is a default-VRF `GigabitEthernet`/`TenGigabitEthernet` interface,
   the one holding the ZTP DHCP lease. `Mgmt-vrf` is not supported yet.
 - `poap/cisco/iosxe.py` runs in Guest Shell (Python 3.6+, `cli` module); keep it
@@ -137,6 +143,17 @@ instruction to resume. Never embed lab credentials in this file.
   failed save leaves the `applying` checkpoint; never blindly reapply.
 - Tested with fixtures only; Catalyst 8000V Guest Shell networking during ZTP is
   not yet confirmed.
+
+## Arista EOS configuration-only boundaries
+
+- Enable with `ZTP_EOS_ENABLED=true` in Lite; `arista_eos` is the default external
+  label, `eos` the canonical identity and `arista` the vendor. Observed `eos` must
+  pair with vendor `arista`, and Cisco platforms with `cisco`.
+- `poap/arista/eos.py` stages `/mnt/flash/startup-config` for the ZTP reboot; it
+  does not change the running config and never overwrites an existing file.
+  Generate it with `scripts/release_eos_bootstrap.py`. Keep it Python 3.6+.
+- Only vEOS/cEOS models with an empty serial fall back to the system MAC as serial.
+- Management is a default-VRF `Management` interface. Tested with fixtures only.
 
 ## NetBox NX-OS context plans
 
