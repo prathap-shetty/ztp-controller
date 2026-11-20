@@ -155,7 +155,9 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
                 verify=state.config.lite_mode and state.config.lite_verification,
             )
         except ZtpError as exc:
-            state.repository.record_registration_failure(observed.serial_number, stage, exc)
+            state.repository.record_registration_failure(
+                observed.serial_number, stage, exc, observed
+            )
             raise
 
     @app.get("/api/v1/ztp/status/{provisioning_id}", response_model=StatusResponse)

@@ -52,5 +52,11 @@ def test_registration_failure_visible_without_attempt(
         assert failure["serial"] == records["observed"]["serial_number"]
         assert failure["code"] == code
         assert failure["stage"] == stage
+        observed = records["observed"]
+        assert (failure["vendor"], failure["platform"], failure["model"]) == (
+            observed["vendor"],
+            observed["platform"],
+            observed["model"].upper(),
+        )
         assert "must-never-be-stored-or-returned" not in str(data)
         assert "test-token" not in str(data)

@@ -55,7 +55,7 @@ class Repository:
         if count > limit:
             raise ZtpError("rate_limited", 429, "Registration rate exceeded; retry later")
 
-    def record_registration_failure(self, serial, stage, error):
+    def record_registration_failure(self, serial, stage, error, observed=None):
         import logging
 
         from sqlalchemy.exc import SQLAlchemyError
@@ -70,6 +70,9 @@ class Repository:
                         code=error.code,
                         message=error.message[:256],
                         created_at=int(time.time()),
+                        vendor=observed.vendor if observed else None,
+                        platform=observed.platform if observed else None,
+                        model=observed.model if observed else None,
                     )
                 )
                 session.flush()
