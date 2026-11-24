@@ -125,10 +125,26 @@ def event(registration, kind):
 
 
 def checkpoint_directory():
+    # Mounts and permissions differ between Guest Shell variants; use the first
+    # writable one. The order is fixed, so a rerun finds the same checkpoint.
+    problems = []
     for root in CHECKPOINT_ROOTS:
-        if os.path.isdir(root):
-            return os.path.join(root, "ztp-lite")
-    raise BootstrapError("No persistent flash directory for the apply checkpoint")
+        if not os.path.isdir(root):
+            continue
+        directory = os.path.join(root, "ztp-lite")
+        try:
+            os.makedirs(directory, mode=0o700, exist_ok=True)
+        except OSError as exc:
+            problems.append(root + ": " + (exc.strerror or type(exc).__name__))
+            continue
+        if os.access(directory, os.W_OK):
+            return directory
+        problems.append(directory + ": not writable")
+    raise BootstrapError(
+        "No writable flash directory for the apply checkpoint ("
+        + ("; ".join(problems) or "no flash mount found")
+        + ")"
+    )
 
 
 def configure(cli, config):
@@ -180,7 +196,6 @@ def apply(cli, observed, interface):
     ):
         raise BootstrapError("Controller returned unsupported XE plan")
     directory = checkpoint_directory()
-    os.makedirs(directory, mode=0o700, exist_ok=True)
     checkpoint = os.path.join(directory, attempt_id + ".json")
     digest = manifest["config"]["sha256"]
     if os.path.exists(checkpoint):
