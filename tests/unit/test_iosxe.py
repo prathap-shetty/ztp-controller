@@ -278,3 +278,23 @@ def test_xe_request_reports_connection_failure_reason(monkeypatch):
     monkeypatch.setattr(module, "build_opener", lambda *handlers: Opener())
     with pytest.raises(module.ControllerUnreachable, match="Network is unreachable"):
         module.request("/api/v1/ztp/register", {})
+
+
+def test_xe_checkpoint_skips_unwritable_flash_and_reports_each_mount(monkeypatch, tmp_path):
+    module = load_bootstrap()
+    locked, writable = tmp_path / "flash", tmp_path / "bootflash"
+    locked.mkdir()
+    writable.mkdir()
+    real_makedirs = module.os.makedirs
+
+    def makedirs(path, mode=0o777, exist_ok=False):
+        if path.startswith(str(locked)):
+            raise PermissionError(13, "Permission denied", path)
+        return real_makedirs(path, mode=mode, exist_ok=exist_ok)
+
+    monkeypatch.setattr(module.os, "makedirs", makedirs)
+    monkeypatch.setattr(module, "CHECKPOINT_ROOTS", (str(locked), str(writable)))
+    assert module.checkpoint_directory() == str(writable / "ztp-lite")
+    monkeypatch.setattr(module, "CHECKPOINT_ROOTS", (str(locked),))
+    with pytest.raises(module.BootstrapError, match="flash: Permission denied"):
+        module.checkpoint_directory()
