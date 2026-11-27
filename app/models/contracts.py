@@ -1,7 +1,14 @@
 from ipaddress import IPv4Address, IPv4Interface, IPv4Network
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 Token = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.():-]+$")]
 Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
@@ -52,6 +59,17 @@ class DeviceIdentity(Contract):
     platform: Token
     model: Token
     status: Token
+    # Inventory device role slug; selects an optional role template include.
+    role: Token | None = None
+
+    @model_serializer(mode="wrap")
+    def omit_empty_role(self, handler):
+        # Devices without a role keep the serialized form, and so the intent and
+        # plan hashes, they had before role support.
+        data = handler(self)
+        if data.get("role") is None:
+            data.pop("role", None)
+        return data
 
 
 class ManagementAddress(Contract):

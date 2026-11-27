@@ -8,6 +8,7 @@ from jinja2 import Environment, StrictUndefined
 
 from app.errors import InvalidIntent, ZtpError
 from app.models.contracts import ConfigArtifact, DeviceIntent, Manifest
+from app.services.templates import render_template
 from app.settings import Settings
 
 
@@ -15,17 +16,14 @@ def render_configuration(intent: DeviceIntent, settings: Settings) -> tuple[str,
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,62}", intent.device.name):
         raise InvalidIntent()
     if settings.lite_mode:
-        template = Path("templates/cisco/nxos_lite.j2").read_text()
-        rendered = (
-            Environment(undefined=StrictUndefined, autoescape=False)
-            .from_string(template)
-            .render(
-                hostname=intent.device.name,
-                password=settings.admin_password.get_secret_value(),
-                management=intent.management.model_dump(mode="json"),
-            )
+        return render_template(
+            Path("templates/cisco/nxos_lite.j2"),
+            "nxos",
+            intent.device.role,
+            hostname=intent.device.name,
+            password=settings.admin_password.get_secret_value(),
+            management=intent.management.model_dump(mode="json"),
         )
-        return rendered, hashlib.sha256(template.encode()).hexdigest()
     if intent.initial_configuration is None:
         raise InvalidIntent()
     key = settings.ssh_public_key_file.read_text().strip().split()

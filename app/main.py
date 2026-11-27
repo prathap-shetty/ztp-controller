@@ -45,23 +45,26 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
         app.state.config = config
         app.state.db = db
         app.state.inventory = inventory
-        use_netbox_context = config.catalog_source == "netbox-context" or (
+        use_context = config.catalog_source in {"netbox-context", "inventory-context"} or (
             config.catalog_source == "auto"
             and config.lite_mode
-            and config.inventory_provider == "netbox"
+            and config.inventory_provider in {"netbox", "infrahub"}
         )
-        adapter_type = NetBoxNxosAdapter if use_netbox_context else CiscoNxosAdapter
-        app.state.adapter = adapter_type(
-            config.image_directory
-            if use_netbox_context
-            else (
+        if use_context:
+            app.state.adapter = NetBoxNxosAdapter(
+                config.image_directory,
+                skip_source_validation=config.skip_source_validation,
+                allow_newer_version=config.allow_newer_version,
+                source=config.inventory_provider,
+            )
+        else:
+            app.state.adapter = CiscoNxosAdapter(
                 config.catalog_path / "lite.json"
                 if config.catalog_path.is_dir()
-                else config.catalog_path
-            ),
-            skip_source_validation=config.skip_source_validation,
-            allow_newer_version=config.allow_newer_version,
-        )
+                else config.catalog_path,
+                skip_source_validation=config.skip_source_validation,
+                allow_newer_version=config.allow_newer_version,
+            )
         app.state.repository = Repository(db)
         try:
             yield

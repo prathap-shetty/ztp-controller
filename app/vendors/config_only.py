@@ -4,11 +4,10 @@ import hashlib
 import re
 from pathlib import Path
 
-from jinja2 import Environment, StrictUndefined
-
 from app.errors import InvalidIntent, ZtpError
 from app.models.contracts import ConfigArtifact
 from app.services.hashing import stable_hash
+from app.services.templates import render_template
 
 
 class ConfigOnlyAdapter:
@@ -35,15 +34,13 @@ class ConfigOnlyAdapter:
             raise InvalidIntent("platform_mismatch", f"{self.label} identity required")
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,62}", intent.device.name):
             raise InvalidIntent()
-        template = self.template.read_text()
-        config = (
-            Environment(undefined=StrictUndefined, autoescape=False)
-            .from_string(template)
-            .render(
-                hostname=intent.device.name,
-                password=settings.admin_password.get_secret_value(),
-                management=intent.management,
-            )
+        config, template_revision = render_template(
+            self.template,
+            self.platform,
+            intent.device.role,
+            hostname=intent.device.name,
+            password=settings.admin_password.get_secret_value(),
+            management=intent.management,
         )
         bootstrap = getattr(settings, self.bootstrap_setting)
         return self.manifest_type(
@@ -54,6 +51,6 @@ class ConfigOnlyAdapter:
             config=ConfigArtifact(
                 sha256=hashlib.sha256(config.encode()).hexdigest(), size_bytes=len(config.encode())
             ),
-            template_revision=hashlib.sha256(template.encode()).hexdigest(),
+            template_revision=template_revision,
             bootstrap_revision=hashlib.sha256(bootstrap.read_bytes()).hexdigest(),
         ), config

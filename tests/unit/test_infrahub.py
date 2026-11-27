@@ -46,7 +46,7 @@ def node():
     }
 
 
-def provider(node, count=1):
+def provider(node, count=1, has_role=True, queries=None):
     def handle(request):
         assert request.method == "POST"
         assert str(request.url) == "https://infrahub.test/graphql/main"
@@ -54,6 +54,11 @@ def provider(node, count=1):
         payload = json.loads(request.content)
         assert payload["query"].startswith("query")
         assert "mutation" not in payload["query"]
+        if queries is not None:
+            queries.append(payload["query"])
+        if "__type" in payload["query"]:
+            fields = [{"name": "name"}, {"name": "serial"}] + ([{"name": "role"}] * has_role)
+            return httpx.Response(200, json={"data": {"__type": {"fields": fields}}})
         return httpx.Response(
             200, json={"data": {"DcimDevice": {"edges": [{"node": node}] * count}}}
         )
@@ -175,3 +180,25 @@ def test_eos_config_only_intent(node):
     with pytest.raises(InvalidIntent, match="Arista EOS does not accept software intent"):
         p.get_device_intent("device-1")
     p.close()
+
+
+def test_role_is_read_only_when_the_schema_has_it(node):
+    node["role"] = attr("Leaf")
+    queries = []
+    assert provider(node, queries=queries).get_device_by_serial("SERIAL01").role == "leaf"
+    assert sum("__type" in q for q in queries) == 1 and "role { value }" in queries[-1]
+    node["role"] = attr("Border Leaf")  # Not a slug: no role template, registration continues.
+    assert provider(node).get_device_by_serial("SERIAL01").role is None
+    queries.clear()
+    node.pop("role")
+    without = provider(node, has_role=False, queries=queries)
+    assert without.get_device_by_serial("SERIAL01").role is None
+    assert "role" not in queries[-1] and "ROLE_FIELD" not in queries[-1]
+
+
+def test_invalid_fields_are_named_without_values(node):
+    node["device_type"]["node"]["part_number"] = attr("Arista vEOS-lab")
+    with pytest.raises(InvalidIntent) as identity_error:
+        provider(node).get_device_by_serial("SERIAL01")
+    assert identity_error.value.message.endswith(": model")
+    assert "vEOS" not in identity_error.value.message

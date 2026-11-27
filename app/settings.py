@@ -35,7 +35,8 @@ class Settings(BaseSettings):
     image_directory: Path = Path("images")
     upgrade_validation_delay_seconds: int = 1800
     upgrade_deadline_seconds: int = 7200
-    catalog_source: Literal["auto", "catalog", "netbox-context"] = "auto"
+    # auto: Lite NetBox/InfraHub use inventory-context NX-OS plans; local YAML a catalog.
+    catalog_source: Literal["auto", "catalog", "netbox-context", "inventory-context"] = "auto"
     catalog_path: Path = Path("catalog/profiles.json")
     inventory_provider: Literal["netbox", "local-yaml", "infrahub"] = "netbox"
     local_inventory_path: Path = Path("inventory/devices.yaml")
@@ -131,6 +132,10 @@ class Settings(BaseSettings):
             not self.lite_mode or self.inventory_provider != "netbox"
         ):
             raise ValueError("NetBox context plans require Lite mode with NetBox inventory")
+        if self.catalog_source == "inventory-context" and (
+            not self.lite_mode or self.inventory_provider not in {"netbox", "infrahub"}
+        ):
+            raise ValueError("Inventory context plans require Lite with NetBox or InfraHub")
         if self.skip_source_validation and not self.lite_mode:
             raise ValueError("Source validation bypass requires Lite mode")
         if self.lite_mode:

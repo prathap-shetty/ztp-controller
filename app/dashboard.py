@@ -78,6 +78,7 @@ def dashboard_data(request: Request):
                     "id": a.id,
                     "device_id": a.intent["device"]["id"],
                     "name": a.intent["device"]["name"],
+                    "role": a.intent["device"].get("role"),
                     "serial": a.observed["serial_number"],
                     "model": a.observed["model"],
                     "address": a.intent["management"]["address"],

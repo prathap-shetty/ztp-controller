@@ -112,6 +112,19 @@ A previous dev-server rebuild was explicitly put on hold. Do not resume remote
 lab deployment merely because code changes are complete; wait for the user's
 instruction to resume. Never embed lab credentials in this file.
 
+## Role-based Lite templates
+
+- `DeviceIdentity.role` is the optional inventory role slug (NetBox `role`/`device_role`,
+  local YAML `device.role`, InfraHub `role` dropdown if its schema has the attribute, detected
+  once by introspection). It is omitted from serialization when absent
+  so existing intent and plan hashes are unchanged.
+- `app/services/templates.py` renders Lite templates; each includes
+  `roles/<platform>/<role>.j2` beside it when present. Slugs outside
+  `[a-z0-9][a-z0-9_-]*` never select a file. Without a role file, output and template
+  revision are those of the common template.
+- Never ship active role files under `templates/`: they apply to every device with that
+  role. Examples live in `examples/roles/`.
+
 ## IOS XR configuration-only boundaries
 
 - Enable with `ZTP_XR_ENABLED=true` in Lite; `cisco_iosxr` is the default external
@@ -155,11 +168,13 @@ instruction to resume. Never embed lab credentials in this file.
 - Only vEOS/cEOS models with an empty serial fall back to the system MAC as serial.
 - Management is a default-VRF `Management` interface. Tested with fixtures only.
 
-## NetBox NX-OS context plans
+## NetBox/InfraHub NX-OS context plans
 
-- `ZTP_CATALOG_SOURCE=auto` uses context-derived NX-OS plans only for Lite NetBox.
-  Local YAML, InfraHub and non-Lite deployments still use a catalog. `catalog`
-  explicitly retains old matching; `netbox-context` requires Lite NetBox.
+- `ZTP_CATALOG_SOURCE=auto` uses inventory-derived NX-OS plans for Lite NetBox and
+  Lite InfraHub. Local YAML and non-Lite deployments still use a catalog. `catalog`
+  explicitly retains old matching; `netbox-context` requires Lite NetBox and
+  `inventory-context` Lite NetBox or InfraHub. Profile IDs are `<provider>-<device id>`;
+  keep `netbox-` unchanged so existing NetBox attempt hashes stay stable.
 - `app/vendors/netbox_nxos.py` derives the profile from authorized intent and the
   local regular non-empty image size. SHA-256 is checked on the switch. It does not
   manufacture a source allowlist: different-release upgrades require the explicit

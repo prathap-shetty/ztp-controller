@@ -68,3 +68,19 @@ def test_prepare_rejects_empty_image_before_writing_catalog(tmp_path):
     assert result.returncode != 0
     assert "non-empty" in result.stderr
     assert not catalog.exists()
+
+
+def test_infrahub_context_plan_uses_its_own_profile_label(netbox, records, tmp_path):
+    image = tmp_path / records["device"]["config_context"]["ztp"]["image"]["filename"]
+    image.write_bytes(b"image")
+    adapter = NetBoxNxosAdapter(tmp_path, allow_newer_version=True, source="infrahub")
+    intent = netbox[0].get_device_intent("1")
+    observed = ObservedDevice(
+        **{**records["observed"], "current_version": intent.software.target_version}
+    )
+    manifest = adapter.build_manifest(intent, observed)
+    assert manifest.compatibility_profile.id == "infrahub-1"
+    assert NetBoxNxosAdapter(tmp_path).source == "netbox"
+    image.unlink()
+    with pytest.raises(ZtpError, match="InfraHub image must exist"):
+        adapter.build_manifest(intent, observed)
