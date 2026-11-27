@@ -10,4 +10,5 @@ ip route 0.0.0.0/0 {{ management.gateway }}
 management ssh
    no shutdown
 !
+{% if role_template %}{% include role_template %}{{ "\n" }}{% endif %}
 end

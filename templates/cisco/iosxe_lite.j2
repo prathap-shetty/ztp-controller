@@ -11,4 +11,5 @@ interface {{ management.interface }}
  ip address {{ management.address.ip }} {{ management.address.netmask }}
  no shutdown
 ip route 0.0.0.0 0.0.0.0 {{ management.gateway }}
+{% if role_template %}{% include role_template %}{{ "\n" }}{% endif %}
 end

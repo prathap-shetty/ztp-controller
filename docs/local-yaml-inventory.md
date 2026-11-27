@@ -8,6 +8,8 @@ In `.env.lite`, set `ZTP_INVENTORY_PROVIDER=local-yaml` and
 `ZTP_LOCAL_INVENTORY_DIR=./inventory`. The directory is mounted read-only and
 records are re-read on access so revocations take effect. Device IDs and chassis
 serials must be unique. Serial/model values normalize to uppercase.
+An optional lowercase `device.role` (for example `leaf`) selects a role template;
+see the role-based configuration section of the user guide.
 
 Use vendor `cisco`, platform `nxos`, interface `mgmt0` and VRF `management`.
 The gateway must be another usable address in the same subnet. Image filename,

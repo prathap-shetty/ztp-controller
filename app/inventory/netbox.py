@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.errors import InvalidIntent, InventoryDenied, InventoryUnavailable
 from app.inventory.base import InventoryProvider
+from app.inventory.diagnostics import invalid_field
 from app.models.contracts import (
     CONFIG_ONLY_LABELS,
     CONFIG_ONLY_MANAGEMENT,
@@ -44,9 +45,12 @@ def identity(
             platform=platforms[record["platform"]["slug"]],
             model=record["device_type"]["model"].upper(),
             status=record["status"]["value"],
+            role=(record.get("role") or record.get("device_role") or {}).get("slug"),
         )
     except (KeyError, TypeError, AttributeError, ValidationError) as exc:
-        raise InvalidIntent() from exc
+        raise InvalidIntent(
+            "invalid_intent", "NetBox device field is missing or invalid: " + invalid_field(exc)
+        ) from exc
 
 
 class NetBoxInventoryProvider(InventoryProvider):
@@ -191,11 +195,13 @@ class NetBoxInventoryProvider(InventoryProvider):
             )
         except KeyError as exc:
             raise InvalidIntent(
-                "missing_ztp_field", "Required ZTP context or management field is missing"
+                "missing_ztp_field",
+                "Required ZTP context or management field is missing: " + invalid_field(exc),
             ) from exc
         except (TypeError, AttributeError, ValidationError) as exc:
             raise InvalidIntent(
-                "invalid_ztp_context", "ZTP context or primary management IP is invalid"
+                "invalid_ztp_context",
+                "ZTP context or primary management IP is invalid: " + invalid_field(exc),
             ) from exc
 
     def check_ready(self) -> None:

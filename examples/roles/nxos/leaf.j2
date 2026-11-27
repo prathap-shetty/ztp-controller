@@ -1,0 +1,7 @@
+{# Example only. Copy to templates/cisco/roles/nxos/leaf.j2 and rebuild the API
+   image to apply it to devices whose NetBox role slug is "leaf". Rendered after
+   the common nxos_lite.j2 configuration with the same variables (hostname,
+   management, role). Keep secrets out of role templates. #}
+feature lacp
+feature lldp
+feature interface-vlan

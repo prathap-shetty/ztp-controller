@@ -15,4 +15,5 @@ router static
   0.0.0.0/0 {{ management.gateway }}
  !
 !
+{% if role_template %}{% include role_template %}{{ "\n" }}{% endif %}
 end

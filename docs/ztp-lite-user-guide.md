@@ -27,7 +27,7 @@ Copy your licensed NX-OS image to `images/` or set `ZTP_IMAGE_DIR` to a large ho
 folder. Verify it against Cisco's published digest. If Cisco provides SHA-512,
 verify that first, then calculate SHA-256 for this controller:
 
-For **NetBox** with the default `ZTP_CATALOG_SOURCE=auto`, keep the verified image
+For **NetBox or InfraHub** with the default `ZTP_CATALOG_SOURCE=auto`, keep the verified image
 in the image directory and generate only the bootstrap:
 
 ```bash
@@ -42,7 +42,7 @@ no local catalog profile is loaded or matched. The device verifies the image
 SHA-256 before installation. The local image must be present even for an
 already-at-target registration in this implementation.
 
-For **local YAML or InfraHub**, prepare the required catalog and bootstrap:
+For **local YAML**, prepare the required catalog and bootstrap:
 
 ```bash
 python3 scripts/prepare_lite.py \
@@ -63,7 +63,7 @@ for this controlled test; it does not establish vendor or hardware qualification
 
 Image filenames are preserved on bootflash. Size and SHA-256 are verified. A file
 with the same name but different contents stops provisioning without overwrite.
-Local YAML and InfraHub require matching catalog/image metadata, including for
+Local YAML requires matching catalog/image metadata, including for
 configuration-only NX-OS operation. Empty images are rejected by the preparation tool.
 
 ## 3. Choose the inventory source
@@ -99,8 +99,9 @@ contains no source-release allowlist. To enforce a source-release list, set
 No source validation is silently bypassed.
 
 `ZTP_CATALOG_SOURCE=netbox-context` explicitly selects the same behavior and requires
-Lite with NetBox inventory. Non-Lite deployments retain catalog behavior. InfraHub
-continues to require a catalog. XR configuration-only behavior is unchanged.
+Lite with NetBox inventory; `inventory-context` allows NetBox or InfraHub. With
+`auto`, Lite InfraHub uses the same plans from its `ztp_*` device attributes.
+Non-Lite deployments retain catalog behavior. XR configuration-only behavior is unchanged.
 
 Compose mounts the existing `catalog/` directory by default, so NetBox needs no
 placeholder `lite.json`. With local YAML, generate `catalog/lite.json` in that
@@ -202,6 +203,37 @@ client's values with:
 ```bash
 sudo tcpdump -i ens3 -nn -vvv -s0 'udp port 67 or udp port 68'
 ```
+
+## Optional: role-based configuration
+
+Each Lite template renders common configuration, then includes a role file when
+one exists for the device's role:
+
+| Platform | Common template | Role files |
+|---|---|---|
+| NX-OS | `templates/cisco/nxos_lite.j2` | `templates/cisco/roles/nxos/<role>.j2` |
+| IOS XE | `templates/cisco/iosxe_lite.j2` | `templates/cisco/roles/iosxe/<role>.j2` |
+| IOS XR | `templates/cisco/iosxr_lite.j2` | `templates/cisco/roles/iosxr/<role>.j2` |
+| Arista EOS | `templates/arista/eos_lite.j2` | `templates/arista/roles/eos/<role>.j2` |
+
+`<role>` is the NetBox device role **slug**, for example `leaf` or `spine`; local
+YAML uses an optional `device.role`; InfraHub uses the `DcimDevice.role` value when
+its schema has one. Role
+files use the same variables as the common template (`hostname`, `management`,
+`role`) and are added after the common lines (before `end` on IOS XE, IOS XR and
+EOS). A device without a role, or whose role has no file, gets only the common
+configuration. Start from `examples/roles/nxos/`. Keep secrets out of role files.
+
+Templates are built into the API image: rebuild after adding or editing them.
+
+```bash
+mkdir -p templates/cisco/roles/nxos
+cp examples/roles/nxos/leaf.j2 templates/cisco/roles/nxos/leaf.j2
+docker compose --env-file .env.lite -f compose.lite.yaml up -d --build ztp-api ztp-worker
+```
+
+The role and role file are part of the saved attempt. Changing a device's role
+or a role file does not change an existing attempt; reset the device to apply it.
 
 ## 5. Provision and verify
 

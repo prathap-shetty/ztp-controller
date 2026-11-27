@@ -1,10 +1,13 @@
 """Read-only InfraHub DcimDevice inventory with explicit ZTP schema extension."""
 
+import re
+
 import httpx
 from pydantic import ValidationError
 
 from app.errors import InvalidIntent, InventoryDenied, InventoryUnavailable
 from app.inventory.base import InventoryProvider
+from app.inventory.diagnostics import invalid_field
 from app.models.contracts import (
     CONFIG_ONLY_LABELS,
     CONFIG_ONLY_PLATFORMS,
@@ -12,7 +15,7 @@ from app.models.contracts import (
     DeviceIntent,
 )
 
-IDENTITY = """id name { value } serial { value } status { value }
+IDENTITY = """id name { value } serial { value } status { value } ROLE_FIELD
 platform { node { name { value } } }
 device_type { node { name { value } part_number { value }
 manufacturer { node { name { value } } } } }"""
@@ -30,6 +33,9 @@ ztp_image_name { value } ztp_image_sha256 { value } ztp_initial_configuration { 
 
 def value(node, name):
     return node[name]["value"]
+
+
+ROLE_SLUG = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
 
 
 class InfraHubInventoryProvider(InventoryProvider):
@@ -56,6 +62,7 @@ class InfraHubInventoryProvider(InventoryProvider):
             platform: "nxos",
         }
         self.endpoint = url.rstrip("/") + "/graphql/" + branch
+        self._role_field = None  # Detected on first use: schemas may lack DcimDevice.role.
         self.client = httpx.Client(
             headers={"X-INFRAHUB-KEY": token},
             verify=verify_ssl,
@@ -84,7 +91,18 @@ class InfraHubInventoryProvider(InventoryProvider):
         except (httpx.HTTPError, ValueError, TypeError, AttributeError):
             raise InventoryUnavailable() from None
 
+    def _fields(self, fields):
+        if self._role_field is None:
+            data = self._query('query { __type(name: "DcimDevice") { fields { name } } }')
+            try:
+                names = {field["name"] for field in data["__type"]["fields"]}
+            except (KeyError, TypeError):
+                raise InventoryUnavailable() from None
+            self._role_field = "role { value }" if "role" in names else ""
+        return fields.replace("ROLE_FIELD", self._role_field)
+
     def _one(self, selector, variable, fields):
+        fields = self._fields(fields)
         query = (
             "query Device($value: "
             + ("String!" if selector == "serial__value" else "[ID]!")
@@ -115,6 +133,7 @@ class InfraHubInventoryProvider(InventoryProvider):
                     "platform_mismatch", "InfraHub platform does not match configured platform"
                 )
             device_type = node["device_type"]["node"]
+            role = ((node.get("role") or {}).get("value") or "").strip().lower()
             return DeviceIdentity(
                 id=node["id"],
                 name=value(node, "name"),
@@ -123,10 +142,13 @@ class InfraHubInventoryProvider(InventoryProvider):
                 model=(value(device_type, "part_number") or value(device_type, "name")).upper(),
                 vendor=value(device_type["manufacturer"]["node"], "name").lower(),
                 platform=self.platforms[value(platform, "name")],
+                # A dropdown value that is not a slug only disables role templates.
+                role=role if ROLE_SLUG.fullmatch(role) else None,
             )
-        except (KeyError, TypeError, AttributeError, ValidationError):
+        except (KeyError, TypeError, AttributeError, ValidationError) as exc:
             raise InvalidIntent(
-                "invalid_identity", "InfraHub device identity is incomplete or invalid"
+                "invalid_identity",
+                "InfraHub device identity is incomplete or invalid: " + invalid_field(exc),
             ) from None
 
     def get_device_by_serial(self, serial):
@@ -182,9 +204,10 @@ class InfraHubInventoryProvider(InventoryProvider):
                     "initial_configuration": value(node, "ztp_initial_configuration"),
                 }
             )
-        except (KeyError, TypeError, AttributeError, ValidationError):
+        except (KeyError, TypeError, AttributeError, ValidationError) as exc:
             raise InvalidIntent(
-                "invalid_ztp_context", "InfraHub ZTP fields or management address are invalid"
+                "invalid_ztp_context",
+                "InfraHub ZTP fields or management address are invalid: " + invalid_field(exc),
             ) from None
 
     def check_ready(self):
