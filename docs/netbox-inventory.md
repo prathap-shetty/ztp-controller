@@ -116,8 +116,26 @@ dashboard shows the serial and model it reported.
 ### Cisco NX-OS
 
 - Interface: `mgmt0`, VRF `management`.
-- The image file must exist, non-empty, in the controller's `images/` folder with
-  the same filename.
+- Software intent (`target_nxos` and `image`) is **optional**:
+  - **Omit both** to configure the switch only, whatever release it runs. No image
+    file, catalog profile or release check is needed.
+  - **Give both** to check the release and upgrade when needed (below). The image
+    file must then exist, non-empty, in the controller's `images/` folder with
+    the same filename.
+  - Giving only one of them is rejected with `nxos_software_incomplete`.
+
+Configuration only:
+
+```json
+{
+  "provisioning": {"ztp_enabled": true},
+  "ztp": {
+    "management": {"interface": "mgmt0", "vrf": "management", "gateway": "192.0.2.1"}
+  }
+}
+```
+
+With release check and upgrade:
 
 ```json
 {
@@ -239,6 +257,7 @@ model and platform, the failed step and a reason. Common ones:
 | `invalid_ztp_context: unknown` | Often no primary IPv4 set on the device | Set the primary IPv4 |
 | `xr/xe/eos_configuration_only` | NX-OS software keys reached a config-only device | Remove them, or scope the shared context (section 5) |
 | `invalid_management_interface` | The primary IPv4 is not on a device interface, is on another device, or is on an interface whose name differs from `ztp.management.interface` | Assign the primary IPv4 to the correctly named interface of this device |
+| `nxos_software_incomplete` | NX-OS context has only one of `target_nxos` and `image` | Give both, or neither for configuration only |
 | `invalid_image_checksum` | NX-OS SHA-256 malformed | 64 lowercase hex characters |
 | `image_unavailable` | NX-OS image file missing or empty on the controller | Copy the image into `images/` |
 | `source_validation_required` | NX-OS running a different release with source checks on | Match `target_nxos` to the running release, or allow the bypass |

@@ -184,6 +184,17 @@ class InfraHubInventoryProvider(InventoryProvider):
                 raise InvalidIntent(
                     code + "_configuration_only", label + " does not accept software intent"
                 )
+            # NX-OS software intent is optional, but must be complete when given.
+            software = [
+                value(node, key)
+                for key in ("ztp_target_version", "ztp_image_name", "ztp_image_sha256")
+            ]
+            if not config_only and any(software) and not all(software):
+                raise InvalidIntent(
+                    "nxos_software_incomplete",
+                    "NX-OS software intent needs target version, image name and SHA-256, or none",
+                )
+            software = all(software)
             return DeviceIntent.model_validate(
                 {
                     "device": identity.model_dump(),
@@ -195,7 +206,7 @@ class InfraHubInventoryProvider(InventoryProvider):
                         "vrf": "default" if config_only else "management",
                     },
                     "software": None
-                    if config_only
+                    if config_only or not software
                     else {
                         "target_version": value(node, "ztp_target_version"),
                         "image_name": value(node, "ztp_image_name"),

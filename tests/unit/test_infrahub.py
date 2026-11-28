@@ -202,3 +202,16 @@ def test_invalid_fields_are_named_without_values(node):
         provider(node).get_device_by_serial("SERIAL01")
     assert identity_error.value.message.endswith(": model")
     assert "vEOS" not in identity_error.value.message
+
+
+def test_nxos_without_software_fields_is_configuration_only(node):
+    for key in ("ztp_target_version", "ztp_image_name", "ztp_image_sha256"):
+        node[key] = attr(None)
+    assert provider(node).get_device_intent("device-1").software is None
+
+
+def test_partial_nxos_software_fields_are_rejected(node):
+    node["ztp_image_name"] = attr(None)
+    with pytest.raises(InvalidIntent) as error:
+        provider(node).get_device_intent("device-1")
+    assert error.value.code == "nxos_software_incomplete"

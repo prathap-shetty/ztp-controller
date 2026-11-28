@@ -195,6 +195,11 @@ def create_app(settings: Settings | None = None, provider=None, engine=None) -> 
             or (
                 config_only is None
                 and attempt.manifest["mode"] != request.app.state.config.execution_mode
+                # NX-OS without software intent is configured only, under either mode.
+                and not (
+                    attempt.manifest["mode"] == "configuration-only"
+                    and attempt.manifest.get("target") is None
+                )
             )
             or (config_only is not None and not config_only.enabled(request.app.state.config))
         ):

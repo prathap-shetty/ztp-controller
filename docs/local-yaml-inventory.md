@@ -12,6 +12,7 @@ An optional lowercase `device.role` (for example `leaf`) selects a role template
 see the role-based configuration section of the user guide.
 
 Use vendor `cisco`, platform `nxos`, interface `mgmt0` and VRF `management`.
+Omit `software` to configure an NX-OS switch only, whatever release it runs.
 The gateway must be another usable address in the same subnet. Image filename,
 SHA-256 and target version must match a unique catalog profile. There is no
 automatic fallback to NetBox or InfraHub. Invalid YAML or unsupported fields fail

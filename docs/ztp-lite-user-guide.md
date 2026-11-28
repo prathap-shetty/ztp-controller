@@ -89,6 +89,9 @@ IPv4 address assigned to its own `mgmt0`. Add local config context:
 }
 ```
 
+To configure an NX-OS switch without checking or upgrading its release, omit both
+`target_nxos` and `image`; no image file or catalog profile is needed then.
+
 With Lite NetBox, `ZTP_CATALOG_SOURCE=auto` uses the context above without a catalog.
 The controller's execution mode permits configuration-only or upgrade-and-configure;
 context-derived profiles are explicitly unqualified and still require the existing

@@ -97,9 +97,10 @@ class SshValidator:
                 or facts["model"] != observed["model"]
             ):
                 return "fatal", {"reason": "device_identity_mismatch"}
-            if not version_satisfies(
+            target = claim["manifest"].get("target")
+            if target and not version_satisfies(
                 facts["current_version"],
-                claim["manifest"]["target"]["target_version"],
+                target["target_version"],
                 claim["manifest"].get("allow_newer_version", False),
             ):
                 return (

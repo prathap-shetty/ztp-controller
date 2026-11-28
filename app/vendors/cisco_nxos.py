@@ -29,7 +29,21 @@ class CiscoNxosAdapter(ZtpVendorAdapter):
         return "nxos-poap"
 
     def build_manifest(self, intent: DeviceIntent, observed: ObservedDevice) -> Manifest:
+        if intent.software is None:
+            return self.configuration_only_manifest(intent)
         return self._build_manifest(intent, observed, self.profiles)
+
+    def configuration_only_manifest(self, intent: DeviceIntent) -> Manifest:
+        """No software intent: no image, catalog profile or release check."""
+        return Manifest(
+            allow_newer_version=self.allow_newer_version,
+            source_validation_enabled=not self.skip_source_validation,
+            device_id=intent.device.id,
+            serial_number=intent.device.serial_number,
+            intent_hash=stable_hash(intent.model_dump(mode="json")),
+            management=intent.management,
+            upgrade_required=False,
+        )
 
     def _build_manifest(self, intent, observed, profiles):
         try:
