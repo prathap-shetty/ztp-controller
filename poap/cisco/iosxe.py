@@ -212,26 +212,49 @@ def shown(text):
     return "<secret line>" if SECRET_WORDS.search(text) else text[:120]
 
 
+IOS_ERROR = re.compile(r"%\s*(?:Invalid|Incomplete|Ambiguous|Unknown|Error)", re.I)
+
+
 def configure(cli, config):
-    """Apply line by line; return None on success, else a safe description."""
-    lines = [
+    """Apply line by line; return None on success, else a safe description.
+
+    Each rendered line must have a successful result. On some releases (for
+    example Catalyst 8000V 17.4) cli.configure also returns an entry with an
+    empty command that is not one of the lines; ignore it unless it carries an
+    IOS error message.
+    """
+    sent = [
         line.rstrip()
         for line in config.decode().splitlines()
         if line.strip() and not line.lstrip().startswith("!") and line.strip() != "end"
     ]
+    # Compare commands without indentation or repeated spaces.
+    lines = [" ".join(line.split()) for line in sent]
     try:
-        results = cli.configure(lines)
+        results = cli.configure(sent)
     except Exception as exc:
         return "configure raised " + type(exc).__name__
     if not results:
         return "configure returned no results"
-    for number, result in enumerate(results, 1):
+    outcome = {}
+    for result in results:
+        command = " ".join(str(getattr(result, "command", "") or "").split())
+        output = str(getattr(result, "output", "") or getattr(result, "notes", "") or "")
+        if not command:
+            if IOS_ERROR.search(output):
+                return "unattributed IOS error -> " + shown(output)
+            continue
         if not getattr(result, "success", False):
-            command = shown(getattr(result, "command", ""))
-            output = getattr(result, "output", "") or getattr(result, "notes", "")
-            detail = "line " + str(number) + " rejected: " + command
-            if command != "<secret line>" and output:
-                detail += " -> " + shown(output)
+            outcome.setdefault(command, output or "rejected")
+        else:
+            outcome.setdefault(command, None)
+    for number, line in enumerate(lines, 1):
+        if line not in outcome:
+            return "line " + str(number) + " has no result: " + shown(line)
+        if outcome[line] is not None:
+            detail = "line " + str(number) + " rejected: " + shown(line)
+            if shown(line) != "<secret line>":
+                detail += " -> " + shown(outcome[line])
             return detail
     return None
 

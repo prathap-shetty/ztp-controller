@@ -417,3 +417,37 @@ def test_xe_save_failure_reports_the_output():
     assert module.save(Unsaved) == (
         "write memory did not report [OK]: Building configuration... % Warning: NVRAM is full"
     )
+
+
+def test_xe_configure_ignores_unattributed_success_entries():
+    module = load_bootstrap()
+    config = (
+        b"hostname edge-1\ninterface GigabitEthernet1\n ip address 192.0.2.5 255.255.255.0\nend\n"
+    )
+
+    def cli(extra, rejected=None):
+        class Cli:
+            @staticmethod
+            def configure(lines):
+                assert lines[2] == " ip address 192.0.2.5 255.255.255.0"  # indentation kept
+                return [extra] + [
+                    ConfigResult(line.strip() != rejected, line, n, "", "")
+                    for n, line in enumerate(lines)
+                ]
+
+        return Cli
+
+    # Catalyst 8000V 17.4: an extra entry with an empty command, marked unsuccessful.
+    blank = ConfigResult(False, "", 0, "", "")
+    assert module.configure(cli(blank), config) is None
+    error = ConfigResult(False, "", 0, "% Invalid input detected at '^' marker.", "")
+    assert module.configure(cli(error), config).startswith("unattributed IOS error -> % Invalid")
+    rejected = module.configure(cli(blank, rejected="hostname edge-1"), config)
+    assert rejected == "line 1 rejected: hostname edge-1 -> rejected"
+
+    class Missing:
+        @staticmethod
+        def configure(lines):
+            return [ConfigResult(True, lines[0], 0, "", "")]
+
+    assert module.configure(Missing, config) == ("line 2 has no result: interface GigabitEthernet1")
