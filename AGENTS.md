@@ -4,8 +4,9 @@
 
 This repository currently packages **ZTP Lite**, a Linux Docker Compose controller
 for Cisco NX-OS POAP, image installation and configuration staging, plus opt-in
-IOS XR, IOS XE and Arista EOS configuration-only lab support. XRv9000, Catalyst
-8000V and vEOS runtime qualification is pending. See `docs/iosxr-configuration-only.md`,
+IOS XR, IOS XE and Arista EOS configuration-only lab support. Lab-verified end to end
+on virtual devices: Nexus 9000v 10.5(4)/10.4(3), Catalyst 8000V 17.04.01a, XRv 9000
+25.1.1 and vEOS-lab 4.30.7M/4.37.0F; hardware and other releases are not qualified. See `docs/iosxr-configuration-only.md`,
 `docs/iosxe-configuration-only.md` and `docs/eos-configuration-only.md`; broader adapter generalization remains in
 `docs/multivendor-implementation-plan.md`.
 
@@ -139,7 +140,10 @@ instruction to resume. Never embed lab credentials in this file.
 - XR CONFIG_APPLYING and CONFIG_COMMITTED are device reports, not independent
   verification. Management-IP changes may interrupt the callback. Keep the durable
   pending/committed checkpoint and never blindly repeat an uncertain apply.
-- This implementation is tested with fixtures, not an actual XRv9000 release yet.
+- Lab-verified on XRv 9000 25.1.1. That release needs: user class `xr-config` in Kea
+  (older releases send `exr-config`), the `ztp_netconf` placeholder import, the full
+  `MgmtEth` name from `show ipv4 interface brief`, and `setns` given the open file.
+  XR 7.2 has no Python 3 and cannot run the bootstrap.
 
 ## IOS XE configuration-only boundaries
 
@@ -154,8 +158,10 @@ instruction to resume. Never embed lab credentials in this file.
   free of newer syntax. Generate it with `scripts/release_xe_bootstrap.py`.
 - IOS XE applies line by line and saves with `write memory`. A rejected line or
   failed save leaves the `applying` checkpoint; never blindly reapply.
-- Tested with fixtures only; Catalyst 8000V Guest Shell networking during ZTP is
-  not yet confirmed.
+- Lab-verified on Catalyst 8000V 17.04.01a. Day0 Guest Shell networking may lag its
+  start (registration retries), it cannot write flash (IOS writes the checkpoint
+  markers with `show clock | redirect bootflash:`), and `cli.configure` results name
+  no command (the apply is then confirmed in `show running-config`).
 
 ## Arista EOS configuration-only boundaries
 
@@ -166,7 +172,8 @@ instruction to resume. Never embed lab credentials in this file.
   does not change the running config and never overwrites an existing file.
   Generate it with `scripts/release_eos_bootstrap.py`. Keep it Python 3.6+.
 - Only vEOS/cEOS models with an empty serial fall back to the system MAC as serial.
-- Management is a default-VRF `Management` interface. Tested with fixtures only.
+- Management is a default-VRF `Management` interface; the device must reach the ZTP
+  network through `Management1`. Lab-verified on vEOS-lab 4.30.7M and 4.37.0F.
 
 ## NetBox/InfraHub NX-OS context plans
 

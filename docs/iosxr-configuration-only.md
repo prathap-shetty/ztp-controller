@@ -1,7 +1,8 @@
 # IOS XR configuration-only lab support
 
-Status: opt-in implementation with simulated/bootstrap and controller tests.
-**XRv9000 is the initial lab target, not yet hardware/runtime qualified.** No XR
+Status: opt-in, **lab-verified end to end on XRv 9000 25.1.1** (registration, commit
+and automatic verification). Other releases and hardware are not qualified. XR 7.2
+has no Python 3 and cannot run the bootstrap. No XR
 image download, release change or software installation is implemented. The router
 keeps its installed release. Existing NX-OS behavior remains separate.
 

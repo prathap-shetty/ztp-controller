@@ -21,5 +21,5 @@ See the [user guide](ztp-lite-user-guide.md) and
 Opt-in IOS XR registration, inventory mappings, configuration rendering and Python 3
 bootstrap are implemented. XR emits a separate schema-v2 configuration-only manifest;
 NX-OS retains its schema-v1 plans. Image installation is unavailable for XR. Simulated
-and controller integration tests pass; XRv9000 release/runtime qualification is still
-pending. See [the XR setup guide](iosxr-configuration-only.md).
+and controller integration tests pass. Lab-verified end to end on XRv 9000 25.1.1;
+other releases and hardware are not qualified. See [the XR setup guide](iosxr-configuration-only.md).

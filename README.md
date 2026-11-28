@@ -11,8 +11,17 @@ password authentication and manual post-boot verification by default; opt-in
 `ZTP_LITE_VERIFICATION` adds ping and SSH checks with a host key pinned on first use.
 It disables NetBox TLS verification. A dashboard token does not encrypt
 traffic. Run it on a controlled provisioning network; it is not a hardened
-production deployment. IOS XR, IOS XE and Arista EOS support is configuration-only
-and awaits XRv9000, Catalyst 8000V and vEOS runtime qualification.
+production deployment. IOS XR, IOS XE and Arista EOS support is configuration-only.
+
+Lab-verified end to end (registration, configuration, automatic verification) on
+virtual devices, one release each; other releases and hardware are not qualified:
+
+| Platform | Device | Release |
+|---|---|---|
+| Cisco NX-OS | Nexus 9000v (`N9K-C9300V`, `N9K-C9500V`) | 10.5(4), 10.4(3) |
+| Cisco IOS XE | Catalyst 8000V (`C8000V`) | 17.04.01a |
+| Cisco IOS XR | XRv 9000 (`R-IOSXRV9000-CC`) | 25.1.1 |
+| Arista EOS | vEOS-lab | 4.30.7M, 4.37.0F |
 
 ## Start here
 
