@@ -117,7 +117,7 @@ Adjust the output to match `ZTP_BOOTSTRAP_DIR` if you use a different bind mount
 
 For an **XR-only** scope, use `examples/iosxr/kea.json` as the Kea configuration
 selected with `ZTP_KEA_CONFIG=./examples/iosxr/kea.json` in `.env.lite`.
-It uses `ens3`, `10.10.10.1/24`, leases `.10–.50` and full boot URL
+It uses `ens3`, `10.10.10.1/24`, leases `.200–.250` and full boot URL
 `http://10.10.10.1/bootstrap/iosxr.py` in both the boot field and option 67.
 The final static `.100` address lies outside the DHCP pool. Start or recreate Kea
 using the chosen file (after confirming there is no competing DHCP server):
