@@ -116,15 +116,26 @@ dashboard shows the serial and model it reported.
 ### Cisco NX-OS
 
 - Interface: `mgmt0`, VRF `management`.
-- Software intent (`target_nxos` and `image`) is **optional**:
-  - **Omit both** to configure the switch only, whatever release it runs. No image
-    file, catalog profile or release check is needed.
-  - **Give both** to check the release and upgrade when needed (below). The image
-    file must then exist, non-empty, in the controller's `images/` folder with
-    the same filename.
-  - Giving only one of them is rejected with `nxos_software_incomplete`.
+- Software intent (`target_nxos` and `image`) is **optional**. Choose one form:
 
-Configuration only:
+| | Configuration only | Release check and upgrade |
+|---|---|---|
+| Context keys | `provisioning`, `ztp.management` | add `ztp.target_nxos` and `ztp.image` |
+| Image file on the controller | not needed | required, non-empty, same filename in `images/` |
+| Release on the switch | not checked; whatever runs is configured | compared with `target_nxos`; upgraded if older |
+| Plan the switch receives | `configuration-only`, `stage-config` only | `stage-config`, or download, install and stage |
+| Dashboard target column | `Configuration only` | the target release |
+| Typical use | NXOSv labs, switches already on the right release | production rollouts that must land on a release |
+
+Giving only one of `target_nxos` and `image` is rejected with
+`nxos_software_incomplete`, so a half-written context never skips an upgrade
+silently.
+
+#### Configuration only (no image)
+
+The switch runs POAP, registers, downloads only its configuration and replays it
+after the POAP reboot. Nothing is downloaded to or installed on bootflash, so
+NXOSv no longer needs a placeholder image file.
 
 ```json
 {
@@ -135,7 +146,11 @@ Configuration only:
 }
 ```
 
-With release check and upgrade:
+Check the merged result on the device's **Config Context** tab: it must show no
+`target_nxos` or `image` keys. A shared context that still carries them (section 5)
+turns the device back into the upgrade form, which then needs the image file.
+
+#### Release check and upgrade
 
 ```json
 {
@@ -216,6 +231,10 @@ EOS devices.
 
 - Scope shared contexts by **platform** (for example NX-OS image defaults only to
   `cisco_nxos`), or use local config context data per device.
+- A shared NX-OS context with `target_nxos`/`image` applies to every NX-OS device
+  it matches. Devices meant to be configured only must not match it; otherwise
+  they need the image file, or fail with `nxos_software_incomplete` if the merge
+  leaves only one of the two keys.
 - Check the merged result on the device's **Config Context** tab before enabling
   ZTP.
 - An empty `vrf` in a broader context can override a device value and fail with
@@ -259,7 +278,7 @@ model and platform, the failed step and a reason. Common ones:
 | `invalid_management_interface` | The primary IPv4 is not on a device interface, is on another device, or is on an interface whose name differs from `ztp.management.interface` | Assign the primary IPv4 to the correctly named interface of this device |
 | `nxos_software_incomplete` | NX-OS context has only one of `target_nxos` and `image` | Give both, or neither for configuration only |
 | `invalid_image_checksum` | NX-OS SHA-256 malformed | 64 lowercase hex characters |
-| `image_unavailable` | NX-OS image file missing or empty on the controller | Copy the image into `images/` |
+| `image_unavailable` | NX-OS image file missing or empty on the controller | Copy the image into `images/`, or remove `target_nxos`/`image` to configure only |
 | `source_validation_required` | NX-OS running a different release with source checks on | Match `target_nxos` to the running release, or allow the bypass |
 | `attempt_conflict` | An attempt already exists for this device | Reset the device in the dashboard, then rerun ZTP |
 | `inventory_unavailable` | NetBox unreachable, or the token was rejected | Check `ZTP_NETBOX_URL`, the token and the network path |
