@@ -148,8 +148,9 @@ class DeviceIntent(Contract):
                 label = CONFIG_ONLY_LABELS[self.device.platform][1]
                 raise ValueError(label + " supports default-VRF configuration only; omit software")
         elif self.device.platform == "nxos":
-            if type(self.management) is not ManagementAddress or self.software is None:
-                raise ValueError("NX-OS requires mgmt0 and software intent")
+            # Software intent is optional: without it the device is configured only.
+            if type(self.management) is not ManagementAddress:
+                raise ValueError("NX-OS requires mgmt0 in the management VRF")
         else:
             raise ValueError("Unsupported platform")
         return self
@@ -194,8 +195,9 @@ class Manifest(Contract):
     device_id: str
     serial_number: str
     intent_hash: Digest
-    compatibility_profile: CompatibilityProfile
-    target: SoftwareIntent
+    # Absent together for an NX-OS device configured without software intent.
+    compatibility_profile: CompatibilityProfile | None = None
+    target: SoftwareIntent | None = None
     management: ManagementAddress
     upgrade_required: bool
     bootstrap_revision: str = "not-implemented"
@@ -204,6 +206,10 @@ class Manifest(Contract):
 
     @model_validator(mode="after")
     def execution_contract(self):
+        if (self.target is None) != (self.compatibility_profile is None):
+            raise ValueError("Target and compatibility profile must be present together")
+        if self.target is None and (self.upgrade_required or self.mode == "upgrade-and-configure"):
+            raise ValueError("Without software intent a plan can only configure")
         if self.mode == "planning-only":
             if self.execution_enabled or self.actions or self.config is not None:
                 raise ValueError("Planning manifests cannot execute")

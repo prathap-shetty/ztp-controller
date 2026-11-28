@@ -45,3 +45,48 @@ def test_lite_netbox_auto_uses_context_not_catalog(settings, netbox, records, db
             client.get("/api/v1/ztp/config/" + body["provisioning_id"], headers=headers).status_code
             == 409
         )
+
+
+def test_lite_netbox_nxos_without_software_is_configured_only(
+    settings, netbox, records, db, tmp_path
+):
+    ztp = records["device"]["config_context"]["ztp"]
+    ztp.pop("target_nxos")
+    ztp.pop("image")
+    # Any running release: no target is compared and no image is needed.
+    observed = {**records["observed"], "current_version": "9.3(8)"}
+    settings = settings.model_copy(
+        update={
+            "lite_mode": True,
+            "admin_password": SecretStr("TestPassword123"),
+            "catalog_source": "auto",
+            "catalog_path": tmp_path / "nonexistent-catalog.json",
+            "image_directory": tmp_path,
+            "execution_mode": "upgrade-and-configure",
+            "allow_unqualified_lab": True,
+        }
+    )
+    with TestClient(create_app(settings, netbox[0], db)) as client:
+        response = client.post("/api/v1/ztp/register", json=observed)
+        assert response.status_code == 200, response.text
+        manifest = response.json()["manifest"]
+        assert manifest["mode"] == "configuration-only"
+        assert manifest["actions"] == ["stage-config"]
+        assert manifest["upgrade_required"] is False
+        assert manifest["target"] is None and manifest["compatibility_profile"] is None
+        body = response.json()
+        headers = {"Authorization": "Bearer " + body["status_token"]}
+        assert (
+            client.get("/api/v1/ztp/image/" + body["provisioning_id"], headers=headers).status_code
+            == 409
+        )
+        config = client.get("/api/v1/ztp/config/" + body["provisioning_id"], headers=headers)
+        assert config.status_code == 200 and "interface mgmt0" in config.text
+
+    # Partial software intent is rejected rather than silently skipping the upgrade.
+    ztp["target_nxos"] = "10.5(4)"
+    records["device"]["serial"] = records["observed"]["serial_number"]
+    with TestClient(create_app(settings, netbox[0], db)) as client:
+        partial = client.post("/api/v1/ztp/register", json=observed)
+        assert partial.status_code == 403
+        assert partial.json()["error"]["code"] == "nxos_software_incomplete"

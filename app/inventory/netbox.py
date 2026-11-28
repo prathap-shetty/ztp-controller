@@ -142,7 +142,16 @@ class NetBoxInventoryProvider(InventoryProvider):
             ztp = context["ztp"]
             import re
 
-            if device.platform == "nxos" and (
+            # NX-OS software intent is optional, but must be complete when given.
+            nxos_software = device.platform == "nxos" and ("target_nxos" in ztp or "image" in ztp)
+            if device.platform == "nxos" and nxos_software != (
+                "target_nxos" in ztp and "image" in ztp
+            ):
+                raise InvalidIntent(
+                    "nxos_software_incomplete",
+                    "NX-OS software intent needs both target_nxos and image, or neither",
+                )
+            if nxos_software and (
                 not isinstance(ztp["image"]["sha256"], str)
                 or not re.fullmatch(r"[a-f0-9]{64}", ztp["image"]["sha256"])
             ):
@@ -200,7 +209,7 @@ class NetBoxInventoryProvider(InventoryProvider):
                     interface=management["interface"],
                 ),
                 software=None
-                if device.platform in CONFIG_ONLY_MANAGEMENT
+                if not nxos_software
                 else SoftwareIntent(
                     target_version=ztp["target_nxos"],
                     image_name=ztp["image"]["filename"],

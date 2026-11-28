@@ -70,6 +70,8 @@ def configuration_manifest(
 ) -> tuple[Manifest, str | None]:
     if settings.execution_mode == "planning-only":
         return manifest, None
+    if manifest.target is None:
+        return configuration_only_nxos(manifest, intent, settings)
     profile = manifest.compatibility_profile
     upgrading = settings.execution_mode == "upgrade-and-configure"
     if upgrading and (
@@ -93,6 +95,32 @@ def configuration_manifest(
             if upgrading and manifest.upgrade_required
             else ["stage-config"]
         ),
+        config=ConfigArtifact(
+            sha256=hashlib.sha256(config.encode()).hexdigest(), size_bytes=len(config.encode())
+        ).model_dump(),
+        template_revision=template_hash,
+        bootstrap_revision=hashlib.sha256(settings.bootstrap_path.read_bytes()).hexdigest(),
+    )
+    return Manifest.model_validate(payload), config
+
+
+def configuration_only_nxos(
+    manifest: Manifest, intent: DeviceIntent, settings: Settings
+) -> tuple[Manifest, str]:
+    """Stage configuration for NX-OS without software intent, whatever it runs."""
+    # No profile records hardware qualification for this path.
+    if not settings.allow_unqualified_lab:
+        raise ZtpError(
+            "replay_not_qualified", 403, "NX-OS without software intent requires lab opt-in"
+        )
+    config, template_hash = render_configuration(intent, settings)
+    payload = manifest.model_dump(mode="json")
+    payload.update(
+        mode="configuration-only",
+        validation_policy="manual" if settings.lite_mode else "ssh",
+        execution_enabled=True,
+        actions=["stage-config"],
+        upgrade_required=False,
         config=ConfigArtifact(
             sha256=hashlib.sha256(config.encode()).hexdigest(), size_bytes=len(config.encode())
         ).model_dump(),

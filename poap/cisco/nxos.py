@@ -247,7 +247,11 @@ def run(cli, environ, bootflash="/bootflash", api=request, image_download=downlo
     registration = json.loads(api("/api/v1/ztp/register", observed))
     manifest = registration["manifest"]
     upgrading = manifest["mode"] == "upgrade-and-configure"
-    target_running = version_satisfies(
+    # Without software intent the controller plans configuration only, whatever
+    # release runs; it then sends no target or compatibility profile.
+    unversioned = manifest.get("target") is None
+    profile = manifest.get("compatibility_profile") or {}
+    target_running = unversioned or version_satisfies(
         observed["current_version"],
         manifest["target"]["target_version"],
         manifest.get("allow_newer_version", False),
@@ -262,11 +266,12 @@ def run(cli, environ, bootflash="/bootflash", api=request, image_download=downlo
         or manifest["execution_enabled"] is not True
         or (not upgrading and (manifest["upgrade_required"] or not target_running))
         or manifest["actions"] != expected_actions
+        or (unversioned and (upgrading or manifest["compatibility_profile"] is not None))
         or (
             upgrading
             and (
-                manifest["compatibility_profile"].get("install_method") != "poap-install-no-reload"
-                or manifest["compatibility_profile"].get("upgrade_path_approved") is not True
+                profile.get("install_method") != "poap-install-no-reload"
+                or profile.get("upgrade_path_approved") is not True
             )
         )
         or (
@@ -274,12 +279,12 @@ def run(cli, environ, bootflash="/bootflash", api=request, image_download=downlo
             and not target_running
             and not any(
                 same_nxos_release(observed["current_version"], v)
-                for v in manifest["compatibility_profile"]["source_versions"]
+                for v in profile.get("source_versions", [])
             )
         )
         or manifest["serial_number"] != observed["serial_number"]
-        or manifest["compatibility_profile"]["model"] != observed["model"]
-        or manifest["compatibility_profile"]["replay_method"] != "scheduled-config-exit"
+        or (not unversioned and profile.get("model") != observed["model"])
+        or (not unversioned and profile.get("replay_method") != "scheduled-config-exit")
         or registration["state"] not in ("AUTHORIZED", "CONFIGURING", "VALIDATING")
     ):
         raise RuntimeError("Not an eligible configuration-only manifest")

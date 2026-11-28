@@ -25,6 +25,8 @@ class NetBoxNxosAdapter(CiscoNxosAdapter):
         self.allow_newer_version = allow_newer_version
 
     def build_manifest(self, intent, observed):
+        if intent.software is None:
+            return self.configuration_only_manifest(intent)
         software = intent.software
         try:
             satisfied = version_satisfies(

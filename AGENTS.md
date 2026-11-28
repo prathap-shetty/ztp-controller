@@ -179,7 +179,12 @@ instruction to resume. Never embed lab credentials in this file.
   local regular non-empty image size. SHA-256 is checked on the switch. It does not
   manufacture a source allowlist: different-release upgrades require the explicit
   Lite source-validation bypass, or use catalog mode for source-release policy.
-- NetBox context mode still requires a non-empty local image, even at target.
+- NX-OS software intent is optional: with no `target_nxos`/`image` (InfraHub: no
+  `ztp_target_version`/`ztp_image_*`) the plan is `configuration-only` with
+  `stage-config` only and no target or profile, under either execution mode. A
+  partial software intent fails with `nxos_software_incomplete`.
+- When software intent is given, NetBox context mode still requires a non-empty local
+  image, even at target.
   Shared catalog matching, image integrity, inventory reauthorization and NX-OS
   execution policy remain in force. XR remains configuration-only.
 - Compose mounts the catalog directory by default; local YAML uses lite.json inside.
