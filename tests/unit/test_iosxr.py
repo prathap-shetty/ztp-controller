@@ -89,8 +89,13 @@ def test_xr_discovery():
         "show inventory": (
             'NAME: "Rack 0", DESCR: "XRv9000"\nPID: IOSXRV9000, VID: V01, SN: SERIAL01'
         ),
-        "show version": "Cisco IOS XR Software, Version 24.2.2",
-        "show interfaces brief": "MgmtEth0/RP0/CPU0/0 up up",
+        "show version": "Cisco IOS XR Software, Version 25.1.1",
+        # Captured from XRv9000 25.1.1 (unassigned before ZTP applies the address).
+        "show ipv4 interface brief": (
+            "MgmtEth0/RP0/CPU0/0            unassigned      Shutdown        Down     default"
+        ),
+        # The abbreviated view must not be used for discovery.
+        "show interfaces brief": "     Mg0/RP0/CPU0/0  admin-down  admin-down  ARPA  1514  0",
         "show interfaces MgmtEth0/RP0/CPU0/0": (
             "Hardware is Management Ethernet, address is 5254.0011.2233"
         ),
@@ -104,6 +109,7 @@ def test_xr_discovery():
     assert observed["serial_number"] == "SERIAL01"
     assert observed["management_mac"] == "52:54:00:11:22:33"
     assert interface == "MgmtEth0/RP0/CPU0/0"
+    assert observed["current_version"] == "25.1.1"
     outputs["show inventory"] = 'NAME: "Slot 0", DESCR: "RP"\nPID: RP, VID: V01, SN: OTHER'
     with pytest.raises(module.BootstrapError, match="chassis"):
         module.discover(Helper())

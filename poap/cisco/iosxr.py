@@ -70,7 +70,9 @@ def discover(helper):
         r"(?:IOS XR Software,?\s+Version|Version)\s*:?\s*([0-9][A-Za-z0-9.()-]*)",
         command(helper, "show version"),
     )
-    interface = command(helper, "show interfaces brief")
+    # "show interfaces brief" abbreviates the port as Mg0/RP0/CPU0/0 on XR 25.x;
+    # the IPv4 brief view lists the full MgmtEth name on every release.
+    interface = command(helper, "show ipv4 interface brief")
     names = re.findall(r"\b(MgmtEth[0-9]+/(?:RP[0-9]+|[0-9]+)/CPU[0-9]+/[0-9]+)\b", interface)
     if not version or len(set(names)) != 1:
         raise BootstrapError("Cannot identify XR version and unique management interface")
