@@ -126,11 +126,12 @@ docker compose --env-file .env.lite -f compose.lite.yaml --profile dhcp up -d --
 ```
 
 For a subnet shared with other platforms, use `examples/mixed-platform/kea.json`:
-its `ztp-iosxr` class matches DHCPv4 user class (option 77) `exr-config` and sends
+its `ztp-iosxr` class matches DHCPv4 user class (option 77) `exr-config`, or
+`xr-config` as sent by XR 25.1.1, and sends
 the full `iosxr.py` URL. XR also sends option 60
 `PXEClient:Arch:00009:UNDI:003010:PID:R-IOSXRV9000-CC`, but its iPXE stage uses the
-same value, so it is not used for matching. XR's client identifier is the literal
-`Not Specified`; lease by MAC (`match-client-id: false`) when several XR devices
+same value, so it is not used for matching. XR's client identifier can be the literal
+`Not Specified` (25.1.1 sends its serial); lease by MAC (`match-client-id: false`) when several XR devices
 share a subnet. This controller serves DHCPv4 only; XR's DHCPv6 solicits go
 unanswered. Do not replace the subnet-wide NX-OS boot URL with the XR URL.
 

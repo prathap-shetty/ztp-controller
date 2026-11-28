@@ -12,8 +12,11 @@ def test_mixed_platform_classes_select_each_bootstrap_without_a_default():
     assert boot["ztp-eos"]["boot-file-name"] == "http://10.10.10.1/bootstrap/eos.py"
     assert boot["ztp-iosxe"]["boot-file-name"] == "http://10.10.10.1/bootstrap/iosxe.py"
     assert boot["ztp-iosxr"]["boot-file-name"] == "http://10.10.10.1/bootstrap/iosxr.py"
-    # XR ZTP sends user class "exr-config" as plain text; its iPXE stage sends "iPXE".
-    assert classes["ztp-iosxr"]["test"] == "option[77].hex == 'exr-config'"
+    # XR ZTP sends user class "exr-config" (or "xr-config" on XR 25.x) as plain
+    # text; its iPXE stage sends "iPXE".
+    assert classes["ztp-iosxr"]["test"] == (
+        "option[77].hex == 'exr-config' or option[77].hex == 'xr-config'"
+    )
     # Every XR sends the literal client ID "Not Specified": lease by MAC instead.
     assert dhcp["subnet4"][0]["match-client-id"] is False
     assert boot["ztp-nxos"] == {

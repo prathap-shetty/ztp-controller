@@ -40,7 +40,7 @@
       },
       {
         "name": "ztp-iosxr",
-        "test": "option[77].hex == 'exr-config'",
+        "test": "option[77].hex == 'exr-config' or option[77].hex == 'xr-config'",
         "option-data": [
           {
             "name": "boot-file-name",
