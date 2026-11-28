@@ -1,8 +1,8 @@
 # IOS XE configuration-only lab support
 
-Status: opt-in implementation with simulated bootstrap and controller tests.
-**Catalyst 8000V on IOS XE 17.x is the initial lab target, not yet runtime
-qualified.** No IOS XE image download, release change or software installation is
+Status: opt-in, **lab-verified end to end on Catalyst 8000V 17.04.01a** (registration,
+configuration, save and automatic verification). Other releases and hardware are not
+qualified. No IOS XE image download, release change or software installation is
 implemented. The device keeps its installed release. NX-OS and IOS XR behavior
 remain separate.
 

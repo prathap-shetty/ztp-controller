@@ -1,7 +1,8 @@
 # Arista EOS configuration-only lab support
 
-Status: opt-in implementation with simulated bootstrap and controller tests.
-**vEOS-lab is the initial lab target, not yet runtime qualified.** No EOS image
+Status: opt-in, **lab-verified end to end on vEOS-lab 4.30.7M and 4.37.0F**
+(registration, staged startup-config, reboot and automatic verification). Other
+releases and hardware are not qualified. No EOS image
 download, release change or software installation is implemented. The switch
 keeps its installed release. Cisco behavior is unchanged.
 
