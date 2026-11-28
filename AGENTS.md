@@ -100,7 +100,7 @@ hardware validation based solely on unit tests or Compose configuration checks.
 ## Documentation and operations
 
 Start with `README.md` and `docs/ztp-lite-user-guide.md`. Provider details are in
-`docs/local-yaml-inventory.md` and `docs/infrahub-inventory.md`. Update examples and
+`docs/netbox-inventory.md`, `docs/local-yaml-inventory.md` and `docs/infrahub-inventory.md`. Update examples and
 Compose environment forwarding alongside new settings.
 
 Keep firmware, real inventory, `.env` files, API tokens and device credentials out
