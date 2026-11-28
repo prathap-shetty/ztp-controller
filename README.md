@@ -14,7 +14,7 @@ traffic. Run it on a controlled provisioning network; it is not a hardened
 production deployment. IOS XR, IOS XE and Arista EOS support is configuration-only.
 
 Lab-verified end to end (registration, configuration, automatic verification) on
-virtual devices, one release each; other releases and hardware are not qualified:
+the virtual devices and releases below; other releases and hardware are not qualified:
 
 | Platform | Device | Release |
 |---|---|---|
