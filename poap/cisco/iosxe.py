@@ -203,7 +203,17 @@ def checkpoint_directory():
     )
 
 
+SECRET_WORDS = re.compile(r"\b(?:password|secret|key-string)\b", re.I)
+
+
+def shown(text):
+    """Operator-safe excerpt: never print a line that may carry a credential."""
+    text = " ".join(str(text or "").split())
+    return "<secret line>" if SECRET_WORDS.search(text) else text[:120]
+
+
 def configure(cli, config):
+    """Apply line by line; return None on success, else a safe description."""
     lines = [
         line.rstrip()
         for line in config.decode().splitlines()
@@ -211,16 +221,30 @@ def configure(cli, config):
     ]
     try:
         results = cli.configure(lines)
-    except Exception:
-        return False
-    return bool(results) and all(getattr(result, "success", False) for result in results)
+    except Exception as exc:
+        return "configure raised " + type(exc).__name__
+    if not results:
+        return "configure returned no results"
+    for number, result in enumerate(results, 1):
+        if not getattr(result, "success", False):
+            command = shown(getattr(result, "command", ""))
+            output = getattr(result, "output", "") or getattr(result, "notes", "")
+            detail = "line " + str(number) + " rejected: " + command
+            if command != "<secret line>" and output:
+                detail += " -> " + shown(output)
+            return detail
+    return None
 
 
 def save(cli):
+    """Save with write memory; return None on success, else a safe description."""
     try:
-        return "[OK]" in cli.execute("write memory")
-    except Exception:
-        return False
+        output = cli.execute("write memory")
+    except Exception as exc:
+        return "write memory raised " + type(exc).__name__
+    if "[OK]" in output:
+        return None
+    return "write memory did not report [OK]: " + shown(output)
 
 
 def register(observed):
@@ -272,12 +296,13 @@ def apply(cli, observed, interface):
         checkpoint.mark("applying")
         event(registration, "CONFIG_APPLYING")
         # IOS XE applies line by line; lines before a rejected one stay in running config.
-        if not configure(cli, config) or not save(cli):
+        problem = configure(cli, config) or save(cli)
+        if problem:
             try:
                 event(registration, "FAILED")
             except Exception:
                 pass
-            raise BootstrapError("XE configuration apply or save failed; inspect device")
+            raise BootstrapError("XE configuration apply or save failed (" + problem + ")")
         checkpoint.mark("committed")
     # A successful apply may change the management address and break the callback.
     # Do not report failure or reapply a saved config just because reporting failed.
