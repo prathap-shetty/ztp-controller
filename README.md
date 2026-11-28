@@ -17,7 +17,7 @@ and awaits XRv9000, Catalyst 8000V and vEOS runtime qualification.
 ## Start here
 
 1. Follow the [user guide](docs/ztp-lite-user-guide.md).
-2. Select [local YAML](docs/local-yaml-inventory.md), NetBox (covered in the guide),
+2. Select [local YAML](docs/local-yaml-inventory.md), [NetBox](docs/netbox-inventory.md)
    or [InfraHub](docs/infrahub-inventory.md).
 3. Read the [internal repository import guide](docs/internal-repository.md) before
    publishing to your internal Git server.

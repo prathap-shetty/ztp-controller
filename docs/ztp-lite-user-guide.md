@@ -108,7 +108,9 @@ placeholder `lite.json`. With local YAML, generate `catalog/lite.json` in that
 directory. An existing `ZTP_CATALOG_FILE=/path/to/catalog.json` file mount is also
 supported. Recreate containers after upgrading Compose or changing these settings.
 
-For InfraHub, follow the [schema and mapping guide](infrahub-inventory.md).
+For the complete NetBox checklist per platform, see the
+[NetBox inventory guide](netbox-inventory.md). For InfraHub, follow the
+[schema and mapping guide](infrahub-inventory.md).
 No automatic fallback occurs when the selected inventory source is unavailable.
 
 ## 4. Start and check
