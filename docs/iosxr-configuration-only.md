@@ -122,13 +122,17 @@ The final static `.100` address lies outside the DHCP pool. Start or recreate Ke
 using the chosen file (after confirming there is no competing DHCP server):
 
 ```bash
-docker compose --env-file .env.lite -f compose.lite.yaml --profile dhcp up -d --force-recreate kea
+docker compose --env-file .env.lite -f compose.lite.yaml --profile dhcp up -d --force-recreate kea-dhcp4
 ```
 
-For a mixed NX-OS/XR subnet, use device reservations or separate scopes to deliver
-the correct script. Do not replace the subnet-wide NX-OS boot URL with the XR URL.
-The tutorial demonstrates an XR serial-derived client identifier; verify the actual
-option 61 bytes with a packet capture before using that reservation method.
+For a subnet shared with other platforms, use `examples/mixed-platform/kea.json`:
+its `ztp-iosxr` class matches DHCPv4 user class (option 77) `exr-config` and sends
+the full `iosxr.py` URL. XR also sends option 60
+`PXEClient:Arch:00009:UNDI:003010:PID:R-IOSXRV9000-CC`, but its iPXE stage uses the
+same value, so it is not used for matching. XR's client identifier is the literal
+`Not Specified`; lease by MAC (`match-client-id: false`) when several XR devices
+share a subnet. This controller serves DHCPv4 only; XR's DHCPv6 solicits go
+unanswered. Do not replace the subnet-wide NX-OS boot URL with the XR URL.
 
 ```bash
 curl --fail http://10.10.10.1/bootstrap/iosxr.py -o /tmp/iosxr.py

@@ -190,15 +190,18 @@ ZTP_KEA_CONFIG=./examples/mixed-platform/kea.json
 |---|---|---|
 | `ztp-eos` | option 60 starts with `Arista;` | `http://10.10.10.1/bootstrap/eos.py` |
 | `ztp-iosxe` | option 60 equals `ciscopnp` | `http://10.10.10.1/bootstrap/iosxe.py` |
+| `ztp-iosxr` | option 77 user class `exr-config` | `http://10.10.10.1/bootstrap/iosxr.py` |
 | `ztp-nxos` | option 77 user class `Cisco-POAP` | `bootstrap/nxos.py` with option 66 `http://10.10.10.1` |
 
-The values come from vEOS 4.30.7M, Catalyst 8000V 17.x and Nexus 9000v POAP
-captures. Option 77 uses RFC 3004 format, so the NX-OS test matches the length byte
+The values come from vEOS 4.30.7M, Catalyst 8000V 17.x, Nexus 9000v POAP and
+XRv9000 (25.1.1) captures. IOS XR sends `exr-config` as plain text, without the
+length byte NX-OS uses; its iPXE image-boot stage sends `iPXE` and is not matched.
+Every IOS XR device sends the literal client identifier `Not Specified`, so the
+subnet sets `match-client-id: false` and leases by MAC address. Option 77 uses RFC 3004 format, so the NX-OS test matches the length byte
 `0x0a` followed by `Cisco-POAP`. Only the NX-OS class sends option 66. Any other
 device that sends `ciscopnp`, such as a different IOS XE model, also receives the
 IOS XE script. A client matching no class gets an address but no boot options.
-IOS XR is not classified yet; add a class from its captured values. Check a
-client's values with:
+Check a client's values with:
 
 ```bash
 sudo tcpdump -i ens3 -nn -vvv -s0 'udp port 67 or udp port 68'
