@@ -52,6 +52,27 @@ def test_invalid_intent_fails_closed(records, netbox, mutation):
         netbox[0].get_device_intent("1")
 
 
+@pytest.mark.parametrize(
+    ("mutation", "reason"),
+    [
+        (
+            lambda r: r["ip"].update(assigned_object_type="virtualization.vminterface"),
+            "not assigned to a device interface",
+        ),
+        (lambda r: r["ip"]["assigned_object"]["device"].update(id=2), "belongs to another device"),
+        (lambda r: r["ip"]["assigned_object"].update(name="mgmt1"), "ztp.management.interface"),
+        (lambda r: r["ip"].update(address="192.0.2.11/24"), "differs from its IP address record"),
+    ],
+)
+def test_primary_ip_mismatch_names_the_failed_check(records, netbox, mutation, reason):
+    mutation(records)
+    with pytest.raises(InvalidIntent) as error:
+        netbox[0].get_device_intent("1")
+    assert error.value.code == "invalid_management_interface"
+    assert reason in error.value.message
+    assert "mgmt1" not in error.value.message and "192.0.2" not in error.value.message
+
+
 @pytest.mark.parametrize("count", [0, 2])
 def test_unknown_or_duplicate_serial(records, count):
     provider = NetBoxInventoryProvider(
