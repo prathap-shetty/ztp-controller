@@ -215,13 +215,49 @@ def shown(text):
 IOS_ERROR = re.compile(r"%\s*(?:Invalid|Incomplete|Ambiguous|Unknown|Error)", re.I)
 
 
+def config_paths(text):
+    """Commands with their parent context, from indentation."""
+    result, parents = set(), []
+    for line in text.splitlines():
+        stripped = " ".join(line.split())
+        if not stripped or stripped.startswith(("!", "#")):
+            continue
+        indent = len(line) - len(line.lstrip())
+        while parents and parents[-1][0] >= indent:
+            parents.pop()
+        path = tuple(p[1] for p in parents) + (stripped,)
+        result.add(path)
+        parents.append((indent, stripped))
+    return result
+
+
+def missing_from_running(expected, running):
+    """Rendered lines absent from running config, as safe descriptions.
+
+    Secret lines are stored hashed and exec-style lines are not shown, so they
+    are skipped; "no shutdown" is the default and only fails if "shutdown" shows.
+    """
+    present = config_paths(running)
+    missing = []
+    for path in sorted(config_paths(expected)):
+        last = path[-1]
+        if last == "end" or last.startswith("crypto key generate ") or SECRET_WORDS.search(last):
+            continue
+        if last == "no shutdown":
+            if path[:-1] + ("shutdown",) in present:
+                missing.append(" > ".join(path[:-1] + ("shutdown present",)))
+            continue
+        if path not in present:
+            missing.append(shown(" > ".join(path)))
+    return missing
+
+
 def configure(cli, config):
     """Apply line by line; return None on success, else a safe description.
 
-    Each rendered line must have a successful result. On some releases (for
-    example Catalyst 8000V 17.4) cli.configure also returns an entry with an
-    empty command that is not one of the lines; ignore it unless it carries an
-    IOS error message.
+    Each rendered line must have a successful result. Some releases (for example
+    Catalyst 8000V 17.4) return results without the command text; then the
+    applied lines are checked in the running configuration instead.
     """
     sent = [
         line.rstrip()
@@ -238,24 +274,33 @@ def configure(cli, config):
         return "configure returned no results"
     outcome = {}
     for result in results:
-        command = " ".join(str(getattr(result, "command", "") or "").split())
+        text = " ".join(str(getattr(result, "command", "") or "").split())
         output = str(getattr(result, "output", "") or getattr(result, "notes", "") or "")
-        if not command:
+        if not text:
             if IOS_ERROR.search(output):
                 return "unattributed IOS error -> " + shown(output)
             continue
-        if not getattr(result, "success", False):
-            outcome.setdefault(command, output or "rejected")
+        if not getattr(result, "success", False) or IOS_ERROR.search(output):
+            outcome.setdefault(text, output or "rejected")
         else:
-            outcome.setdefault(command, None)
+            outcome.setdefault(text, None)
+    # A named rejection always fails, even when other results are unattributed.
     for number, line in enumerate(lines, 1):
-        if line not in outcome:
-            return "line " + str(number) + " has no result: " + shown(line)
-        if outcome[line] is not None:
+        if outcome.get(line) is not None:
             detail = "line " + str(number) + " rejected: " + shown(line)
             if shown(line) != "<secret line>":
                 detail += " -> " + shown(outcome[line])
             return detail
+    if all(line in outcome for line in lines):
+        return None
+    # Results do not name the commands: check what actually took effect.
+    try:
+        running = command(cli, "show running-config")
+    except BootstrapError:
+        return "results not attributable and show running-config failed"
+    missing = missing_from_running(config.decode(), running)
+    if missing:
+        return "not in running-config after apply: " + "; ".join(missing[:3])
     return None
 
 
