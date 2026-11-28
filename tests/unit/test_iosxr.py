@@ -226,3 +226,39 @@ def test_xr_helper_import_reraises_unrelated_errors(monkeypatch, tmp_path):
         module.load_helpers()
     for name in ("ztp_helper", "ztp_netconf"):
         sys.modules.pop(name, None)
+
+
+@pytest.mark.parametrize("style", ["descriptor", "file-object"])
+def test_xr_enter_global_vrf_supports_both_setns_signatures(tmp_path, style):
+    module = load_bootstrap()
+    namespace = tmp_path / "global-vrf"
+    namespace.write_text("")
+    entered = []
+
+    class Helper:
+        def get_netns_path(self, nsname):
+            assert nsname == "global-vrf"
+            return str(namespace)
+
+        def setns(self, fd, nstype):
+            # XR 25.1.1 calls fd.fileno(); older helpers take the integer.
+            entered.append(fd.fileno() if style == "file-object" else int(fd))
+
+    module.enter_global_vrf(Helper())
+    assert len(entered) == 1 and isinstance(entered[0], int)
+
+
+def test_xr_enter_global_vrf_reraises_other_attribute_errors(tmp_path):
+    module = load_bootstrap()
+    namespace = tmp_path / "global-vrf"
+    namespace.write_text("")
+
+    class Helper:
+        def get_netns_path(self, nsname):
+            return str(namespace)
+
+        def setns(self, fd, nstype):
+            raise AttributeError("'NoneType' object has no attribute 'setns'")
+
+    with pytest.raises(AttributeError, match="setns"):
+        module.enter_global_vrf(Helper())
