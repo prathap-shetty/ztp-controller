@@ -21,3 +21,6 @@ catalog/lite.json
 /inventory/devices.yaml
 .env.*
 !.env.lite.example
+
+# Local course material, not committed
+docs/ztp-lite-course-guide.md

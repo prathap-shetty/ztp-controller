@@ -119,7 +119,7 @@ No automatic fallback occurs when the selected inventory source is unavailable.
 ## 4. Start and check
 
 Review `deploy/lite/kea.json`: interface `ens3`, subnet `10.10.10.0/24`, pool
-`10.10.10.10–149`, router/script host `10.10.10.1`, DNS `8.8.8.8`. Replace the DNS
+`10.10.10.200–250`, router/script host `10.10.10.1`, DNS `8.8.8.8`. Replace the DNS
 example with a reachable resolver where appropriate. Both DHCP router and DNS
 options are included because NX-OS POAP requires them.
 
