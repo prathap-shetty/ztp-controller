@@ -124,6 +124,62 @@ def event(registration, kind):
             time.sleep(2)
 
 
+class FileCheckpoint:
+    """Checkpoint file in a flash directory Guest Shell can write."""
+
+    def __init__(self, directory, attempt_id, digest):
+        self.path = os.path.join(directory, attempt_id + ".json")
+        self.digest = digest
+
+    def state(self):
+        if not os.path.exists(self.path):
+            return None
+        with open(self.path) as handle:
+            saved = json.load(handle)
+        return saved.get("state") if saved.get("sha256") == self.digest else "mismatch"
+
+    def mark(self, state):
+        save_checkpoint(self.path, self.digest, state)
+
+
+class IosCheckpoint:
+    """Checkpoint markers written by IOS when Guest Shell cannot write flash.
+
+    Day0 Guest Shell on some releases (for example Catalyst 8000V 17.4) cannot
+    write /flash or /bootflash, while IOS can. The state is encoded in the file
+    name; the content is only the output of "show clock", never configuration.
+    """
+
+    def __init__(self, cli, attempt_id, digest):
+        self.cli = cli
+        self.base = "ztp-lite-" + attempt_id + "-" + digest[:12]
+
+    def state(self):
+        listing = command(self.cli, "dir bootflash:")
+        names = set(re.findall(r"(" + re.escape(self.base) + r"\.(?:applying|committed))", listing))
+        if self.base + ".committed" in names:
+            return "committed"
+        if self.base + ".applying" in names:
+            return "applying"
+        # Markers for this attempt with another digest mean an uncertain outcome.
+        if re.search(re.escape(self.base[:-12]) + r"[0-9a-f]{12}\.", listing):
+            return "mismatch"
+        return None
+
+    def mark(self, state):
+        command(self.cli, "show clock | redirect bootflash:" + self.base + "." + state)
+        # Read back through IOS: a redirect that silently failed must not count.
+        if self.state() != state:
+            raise BootstrapError("Could not record the " + state + " checkpoint on bootflash")
+
+
+def open_checkpoint(cli, attempt_id, digest):
+    try:
+        return FileCheckpoint(checkpoint_directory(), attempt_id, digest)
+    except BootstrapError:
+        return IosCheckpoint(cli, attempt_id, digest)
+
+
 def checkpoint_directory():
     # Mounts and permissions differ between Guest Shell variants; use the first
     # writable one. The order is fixed, so a rerun finds the same checkpoint.
@@ -195,13 +251,11 @@ def apply(cli, observed, interface):
         or manifest.get("management", {}).get("vrf") != "default"
     ):
         raise BootstrapError("Controller returned unsupported XE plan")
-    directory = checkpoint_directory()
-    checkpoint = os.path.join(directory, attempt_id + ".json")
     digest = manifest["config"]["sha256"]
-    if os.path.exists(checkpoint):
-        with open(checkpoint) as handle:
-            saved = json.load(handle)
-        if saved != {"sha256": digest, "state": "committed"}:
+    checkpoint = open_checkpoint(cli, attempt_id, digest)
+    previous = checkpoint.state()
+    if previous is not None:
+        if previous != "committed":
             raise BootstrapError(
                 "Previous apply outcome is uncertain; inspect device and reset attempt"
             )
@@ -215,7 +269,7 @@ def apply(cli, observed, interface):
         ):
             raise BootstrapError("Configuration integrity check failed")
         # Persist a pending marker before applying; an interrupted run must not blindly reapply.
-        save_checkpoint(checkpoint, digest, "applying")
+        checkpoint.mark("applying")
         event(registration, "CONFIG_APPLYING")
         # IOS XE applies line by line; lines before a rejected one stay in running config.
         if not configure(cli, config) or not save(cli):
@@ -224,7 +278,7 @@ def apply(cli, observed, interface):
             except Exception:
                 pass
             raise BootstrapError("XE configuration apply or save failed; inspect device")
-        save_checkpoint(checkpoint, digest, "committed")
+        checkpoint.mark("committed")
     # A successful apply may change the management address and break the callback.
     # Do not report failure or reapply a saved config just because reporting failed.
     try:

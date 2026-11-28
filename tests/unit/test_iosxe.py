@@ -298,3 +298,72 @@ def test_xe_checkpoint_skips_unwritable_flash_and_reports_each_mount(monkeypatch
     monkeypatch.setattr(module, "CHECKPOINT_ROOTS", (str(locked),))
     with pytest.raises(module.BootstrapError, match="flash: Permission denied"):
         module.checkpoint_directory()
+
+
+@pytest.mark.parametrize("scenario", ["success", "apply-failed", "redirect-ignored"])
+def test_xe_ios_checkpoint_when_guest_shell_cannot_write_flash(monkeypatch, tmp_path, scenario):
+    module = load_bootstrap()
+    manifest, config = CiscoIosxeAdapter().prepare(xe_intent(), xe_observed(), xe_settings())
+    registration = {
+        "manifest": manifest.model_dump(mode="json"),
+        "provisioning_id": str(uuid4()),
+        "status_token": "test-token",
+    }
+    events, applied, bootflash, executed = [], [], set(), []
+
+    def request(path, data=None, token=None, limit=None):
+        if path.endswith("/register"):
+            return json.dumps(registration).encode()
+        if "/config/" in path:
+            return config.encode()
+        events.append(data["event"])
+        return b"{}"
+
+    class Cli:
+        @staticmethod
+        def configure(lines):
+            applied.append(lines)
+            ok = scenario != "apply-failed"
+            return [ConfigResult(ok or n != 1, line, n, "", "") for n, line in enumerate(lines)]
+
+        @staticmethod
+        def execute(text):
+            executed.append(text)
+            if text == "write memory":
+                return "Building configuration...\n[OK]"
+            if text == "dir bootflash:":
+                return "Directory of bootflash:/\n" + "\n".join(
+                    f"  12  -rw-  31  Nov 28 2026 10:00:00 +00:00  {name}" for name in bootflash
+                )
+            prefix = "show clock | redirect bootflash:"
+            assert text.startswith(prefix), text
+            if scenario != "redirect-ignored":
+                bootflash.add(text[len(prefix) :])
+            return ""
+
+    # No writable flash directory: the IOS-managed markers are used.
+    monkeypatch.setattr(module, "CHECKPOINT_ROOTS", (str(tmp_path / "missing"),))
+    monkeypatch.setattr(module, "request", request)
+    monkeypatch.setattr(module.time, "sleep", lambda _: None)
+    observed = xe_observed().model_dump()
+    base = "ztp-lite-" + registration["provisioning_id"] + "-" + manifest.config.sha256[:12]
+    if scenario == "redirect-ignored":
+        with pytest.raises(module.BootstrapError, match="applying checkpoint"):
+            module.apply(Cli, observed, "GigabitEthernet1")
+        assert applied == [] and events == []
+        return
+    if scenario == "apply-failed":
+        with pytest.raises(module.BootstrapError):
+            module.apply(Cli, observed, "GigabitEthernet1")
+        assert bootflash == {base + ".applying"}
+        with pytest.raises(module.BootstrapError, match="uncertain"):
+            module.apply(Cli, observed, "GigabitEthernet1")
+        assert len(applied) == 1
+        return
+    assert module.apply(Cli, observed, "GigabitEthernet1") == 0
+    assert bootflash == {base + ".applying", base + ".committed"}
+    assert events == ["CONFIG_APPLYING", "CONFIG_COMMITTED"]
+    # Markers never contain configuration: only "show clock" is redirected.
+    assert all("running" not in text for text in executed)
+    assert module.apply(Cli, observed, "GigabitEthernet1") == 0
+    assert len(applied) == 1
