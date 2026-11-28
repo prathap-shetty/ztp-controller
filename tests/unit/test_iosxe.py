@@ -450,4 +450,63 @@ def test_xe_configure_ignores_unattributed_success_entries():
         def configure(lines):
             return [ConfigResult(True, lines[0], 0, "", "")]
 
-    assert module.configure(Missing, config) == ("line 2 has no result: interface GigabitEthernet1")
+        @staticmethod
+        def execute(text):
+            raise RuntimeError("no CLI")
+
+    assert module.configure(Missing, config) == (
+        "results not attributable and show running-config failed"
+    )
+
+
+def test_xe_configure_checks_running_config_when_results_name_no_command():
+    module = load_bootstrap()
+    config = (
+        b"hostname edge-1\n"
+        b"username admin privilege 15 secret 0 TestPassword123\n"
+        b"crypto key generate rsa general-keys label ZTP-LITE-SSH modulus 2048\n"
+        b"interface GigabitEthernet1\n ip address 192.0.2.5 255.255.255.0\n no shutdown\n"
+        b"ip route 0.0.0.0 0.0.0.0 192.0.2.1\nend\n"
+    )
+    running = (
+        "Building configuration...\nhostname edge-1\n"
+        "username admin privilege 15 secret 9 $9$hashed\n"
+        "interface GigabitEthernet1\n ip address 192.0.2.5 255.255.255.0\n"
+        "ip route 0.0.0.0 0.0.0.0 192.0.2.1\nend\n"
+    )
+
+    def cli(running_config, output=""):
+        class Cli:
+            @staticmethod
+            def configure(lines):
+                # Catalyst 8000V 17.4: entries without the command text.
+                return [ConfigResult(False, "", n, output, "") for n, _ in enumerate(lines)]
+
+            @staticmethod
+            def execute(text):
+                assert text == "show running-config"
+                return running_config
+
+        return Cli
+
+    assert module.configure(cli(running), config) is None
+    route = "ip route 0.0.0.0 0.0.0.0 192.0.2.1"
+    missing = module.configure(cli(running.replace(route + "\n", "")), config)
+    assert missing == "not in running-config after apply: " + route
+    address = " ip address 192.0.2.5 255.255.255.0\n"
+    shut = module.configure(cli(running.replace(address, address + " shutdown\n")), config)
+    assert "shutdown present" in shut
+    rejected = module.configure(cli(running, "% Invalid input detected at '^' marker."), config)
+    assert rejected.startswith("unattributed IOS error -> % Invalid")
+    assert "TestPassword123" not in missing + shut + rejected
+
+    class Partly:
+        @staticmethod
+        def configure(lines):
+            return [ConfigResult(False, "", 0, "", ""), ConfigResult(False, lines[-1], 1, "%", "")]
+
+        @staticmethod
+        def execute(text):
+            return running
+
+    assert module.configure(Partly, config).startswith("line 7 rejected: " + route)
