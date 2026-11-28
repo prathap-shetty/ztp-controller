@@ -59,6 +59,9 @@ def configuration(mode, interface="eth1", server="192.0.2.2"):
             "valid-lifetime": 3600,
             "renew-timer": 900,
             "rebind-timer": 1800,
+            # NX-OS POAP rejects leases under one hour; Kea's lease cache would
+            # re-offer an existing lease with only its remaining time.
+            "cache-threshold": 0.0,
             "subnet4": [
                 {
                     "id": 1,

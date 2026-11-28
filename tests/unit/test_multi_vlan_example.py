@@ -39,3 +39,16 @@ def test_nxos_kea_example_matches_the_default_lite_scope():
     assert example == json.loads((ROOT / "deploy/lite/kea.json").read_text())
     options = {o["name"]: o["data"] for o in example["Dhcp4"]["subnet4"][0]["option-data"]}
     assert options["boot-file-name"] == "bootstrap/nxos.py"
+
+
+def test_kea_configs_always_offer_full_one_hour_leases():
+    # NX-OS POAP rejects a lease under one hour. Kea's lease cache would re-offer
+    # an existing lease with only its remaining time, so caching is disabled.
+    from scripts.kea_profiles import configuration
+
+    configs = [ROOT / "deploy/lite/kea.json", *sorted((ROOT / "examples").glob("*/kea.json"))]
+    dhcp = [json.loads(path.read_text())["Dhcp4"] for path in configs]
+    dhcp += [configuration(mode)["Dhcp4"] for mode in ("legacy-http", "secure-https")]
+    for item in dhcp:
+        assert item["cache-threshold"] == 0
+        assert item["valid-lifetime"] >= 3600
