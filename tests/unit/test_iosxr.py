@@ -177,3 +177,46 @@ def test_netbox_xr_without_image(records, netbox):
     device["config_context"]["ztp"]["image"] = {}
     with pytest.raises(ZtpError, match="software intent"):
         netbox[0].get_device_intent("1")
+
+
+def fake_helper_dir(tmp_path, netconf_error):
+    (tmp_path / "ztp_helper.py").write_text(
+        "from ztp_netconf import xr_netconf, xr_netconf_proxy_stop\n"
+        "class ZtpHelpers:\n"
+        "    def netconf(self):\n"
+        "        return xr_netconf()\n"
+    )
+    (tmp_path / "ztp_netconf.py").write_text(
+        f"raise ImportError({netconf_error!r})\nxr_netconf = xr_netconf_proxy_stop = None\n"
+    )
+    return str(tmp_path)
+
+
+def test_xr_helper_import_tolerates_broken_netconf_dependency(monkeypatch, tmp_path):
+    import sys
+
+    module = load_bootstrap()
+    error = "bad magic number in 'netconf_client_ztp_lib': b'B\\r\\r\\n'"
+    monkeypatch.setattr(module, "HELPER_PATH", fake_helper_dir(tmp_path, error))
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    for name in ("ztp_helper", "ztp_netconf"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    helpers = module.load_helpers()()
+    with pytest.raises(module.BootstrapError, match="NETCONF helper is unavailable"):
+        helpers.netconf()
+    for name in ("ztp_helper", "ztp_netconf"):
+        sys.modules.pop(name, None)
+
+
+def test_xr_helper_import_reraises_unrelated_errors(monkeypatch, tmp_path):
+    import sys
+
+    module = load_bootstrap()
+    monkeypatch.setattr(module, "HELPER_PATH", fake_helper_dir(tmp_path, "No module named 'json5'"))
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    for name in ("ztp_helper", "ztp_netconf"):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    with pytest.raises(ImportError, match="json5"):
+        module.load_helpers()
+    for name in ("ztp_helper", "ztp_netconf"):
+        sys.modules.pop(name, None)

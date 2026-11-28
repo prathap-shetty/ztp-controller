@@ -8,6 +8,7 @@ import re
 import sys
 import tempfile
 import time
+import types
 import uuid
 from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
@@ -179,11 +180,40 @@ def save_checkpoint(path, digest, state):
     os.replace(path + ".tmp", path)
 
 
-def main():
-    sys.path.append("/pkg/bin")
-    from ztp_helper import ZtpHelpers
+HELPER_PATH = "/pkg/bin"
 
-    helper = ZtpHelpers()
+
+def load_helpers():
+    """Import Cisco ZtpHelpers, tolerating a broken optional NETCONF dependency.
+
+    On XR 25.1.1, ztp_helper imports ztp_netconf, whose netconf_client_ztp_lib is
+    shipped only as bytecode for another Python version ("bad magic number").
+    ZTP Lite uses only xrcmd, xrapply and the namespace helpers, never NETCONF,
+    so retry once with a ztp_netconf placeholder that fails if it is ever called.
+    """
+    if HELPER_PATH not in sys.path:
+        sys.path.append(HELPER_PATH)
+    try:
+        from ztp_helper import ZtpHelpers
+    except ImportError as exc:
+        if "netconf" not in str(exc).lower():
+            raise
+        reason = str(exc)[:120]
+        for name in ("ztp_helper", "ztp_netconf", "netconf_client_ztp_lib"):
+            sys.modules.pop(name, None)
+
+        def unavailable(*args, **kwargs):
+            raise BootstrapError("XR NETCONF helper is unavailable: " + reason)
+
+        placeholder = types.ModuleType("ztp_netconf")
+        placeholder.xr_netconf = placeholder.xr_netconf_proxy_stop = unavailable
+        sys.modules["ztp_netconf"] = placeholder
+        from ztp_helper import ZtpHelpers
+    return ZtpHelpers
+
+
+def main():
+    helper = load_helpers()()
     helper.toggle_debug(False)
     observed, interface = discover(helper)
     # urllib needs the same default-VRF namespace as the ZTP transport.
@@ -202,6 +232,9 @@ if __name__ == "__main__":
             + (
                 str(exc)
                 if isinstance(exc, BootstrapError)
+                # Import errors name modules and paths only; show them for diagnosis.
+                else "ImportError: " + str(exc)[:200]
+                if isinstance(exc, ImportError)
                 else type(exc).__name__ + "; check router ZTP logs"
             )
         )
