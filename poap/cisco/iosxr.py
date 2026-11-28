@@ -218,10 +218,23 @@ def main():
     helper = load_helpers()()
     helper.toggle_debug(False)
     observed, interface = discover(helper)
-    # urllib needs the same default-VRF namespace as the ZTP transport.
-    with open(helper.get_netns_path(nsname="global-vrf")) as namespace:
-        helper.setns(namespace.fileno(), 0)
+    enter_global_vrf(helper)
     return apply(helper, observed, interface)
+
+
+def enter_global_vrf(helper):
+    """Enter the default-VRF namespace that the ZTP transport uses, for urllib.
+
+    Older ZtpHelpers.setns takes a file descriptor; XR 25.1.1 takes the open file
+    and calls fileno() itself. Try the descriptor first, as before.
+    """
+    with open(helper.get_netns_path(nsname="global-vrf")) as namespace:
+        try:
+            helper.setns(namespace.fileno(), 0)
+        except AttributeError as exc:
+            if "fileno" not in str(exc):
+                raise
+            helper.setns(namespace, 0)
 
 
 if __name__ == "__main__":
