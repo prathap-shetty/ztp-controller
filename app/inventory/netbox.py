@@ -164,13 +164,27 @@ class NetBoxInventoryProvider(InventoryProvider):
                 raise InvalidIntent()
             ip_record = self._get(f"ipam/ip-addresses/{ip_id}/")
             assigned = ip_record["assigned_object"]
-            if (
-                ip_record["assigned_object_type"] != "dcim.interface"
-                or str(assigned["device"]["id"]) != device_id
-                or assigned["name"] != management["interface"]
-                or primary["address"] != ip_record["address"]
+            # Name the failed check, never inventory values.
+            for failed, reason in (
+                (
+                    ip_record["assigned_object_type"] != "dcim.interface",
+                    "primary IPv4 is not assigned to a device interface",
+                ),
+                (
+                    str(assigned["device"]["id"]) != device_id,
+                    "primary IPv4 interface belongs to another device",
+                ),
+                (
+                    assigned["name"] != management["interface"],
+                    "primary IPv4 interface name differs from ztp.management.interface",
+                ),
+                (
+                    primary["address"] != ip_record["address"],
+                    "primary IPv4 address differs from its IP address record",
+                ),
             ):
-                raise InvalidIntent()
+                if failed:
+                    raise InvalidIntent("invalid_management_interface", reason)
             return DeviceIntent(
                 device=device,
                 ztp_enabled=True,
