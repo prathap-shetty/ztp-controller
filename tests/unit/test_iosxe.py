@@ -367,3 +367,53 @@ def test_xe_ios_checkpoint_when_guest_shell_cannot_write_flash(monkeypatch, tmp_
     assert all("running" not in text for text in executed)
     assert module.apply(Cli, observed, "GigabitEthernet1") == 0
     assert len(applied) == 1
+
+
+def test_xe_apply_failure_names_the_line_without_secrets():
+    module = load_bootstrap()
+    config = (
+        b"hostname edge-1\nusername admin privilege 15 secret 0 TestPassword123\n"
+        b"crypto key generate rsa general-keys label ZTP-LITE-SSH modulus 2048\nend\n"
+    )
+
+    def cli_rejecting(bad):
+        class Cli:
+            @staticmethod
+            def configure(lines):
+                return [
+                    ConfigResult(
+                        n != bad, line, n, "% Invalid input detected" if n == bad else "", ""
+                    )
+                    for n, line in enumerate(lines)
+                ]
+
+        return Cli
+
+    assert module.configure(cli_rejecting(-1), config) is None
+    crypto = module.configure(cli_rejecting(2), config)
+    assert crypto == (
+        "line 3 rejected: crypto key generate rsa general-keys label ZTP-LITE-SSH "
+        "modulus 2048 -> % Invalid input detected"
+    )
+    secret = module.configure(cli_rejecting(1), config)
+    assert secret == "line 2 rejected: <secret line>"
+    assert "TestPassword123" not in secret
+
+
+def test_xe_save_failure_reports_the_output():
+    module = load_bootstrap()
+
+    class Saved:
+        @staticmethod
+        def execute(text):
+            return "Building configuration...\n[OK]"
+
+    class Unsaved:
+        @staticmethod
+        def execute(text):
+            return "Building configuration...\n% Warning: NVRAM is full"
+
+    assert module.save(Saved) is None
+    assert module.save(Unsaved) == (
+        "write memory did not report [OK]: Building configuration... % Warning: NVRAM is full"
+    )
